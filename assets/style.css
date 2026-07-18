@@ -232,7 +232,7 @@ p {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: default;
   flex-shrink: 0;
 }
 
@@ -250,7 +250,7 @@ p {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
+  cursor: default;
 }
 
 @media (max-width: 880px) {
@@ -285,7 +285,7 @@ p {
 .swatch-rail button {
   appearance: none;
   border: 2px solid rgba(255, 255, 255, 0.18);
-  cursor: pointer;
+  cursor: default;
   width: 30px;
   height: 30px;
   border-radius: 999px;
@@ -518,7 +518,7 @@ p {
   border-radius: var(--radius-sm);
   padding: 0;
   background: none;
-  cursor: pointer;
+  cursor: default;
 }
 
 .field input[type="color"]::-webkit-color-swatch-wrapper {
@@ -593,7 +593,7 @@ button.copy-btn {
   font-weight: 700;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
+  cursor: default;
   flex-shrink: 0;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -619,7 +619,7 @@ button.action-btn {
   font-size: 14px;
   padding: 10px 16px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
+  cursor: default;
 }
 
 button.ghost-btn {
@@ -631,7 +631,7 @@ button.ghost-btn {
   font-size: 13px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
+  cursor: default;
 }
 
 .swatch-preview {
@@ -671,7 +671,7 @@ button.ghost-btn {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: none;
-  cursor: pointer;
+  cursor: default;
 }
 
 .stop-row .pos-value {
@@ -735,7 +735,7 @@ button.ghost-btn {
   border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
-  cursor: pointer;
+  cursor: default;
 }
 
 .scheme-tabs button[aria-pressed="true"] {
@@ -818,7 +818,7 @@ button.ghost-btn {
   border-radius: var(--radius);
   padding: 36px 20px;
   text-align: center;
-  cursor: pointer;
+  cursor: default;
   margin-bottom: 18px;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -957,7 +957,7 @@ button.ghost-btn {
   display: block;
   width: 10px;
   margin: 14px 0 0 auto;
-  line-height: 0; cursor: pointer; }
+  line-height: 0; cursor: default; }
 
 .erabbit-mark img {
   display: block;
