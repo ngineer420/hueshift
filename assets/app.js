@@ -160,6 +160,7 @@
     var navLinks = document.querySelectorAll("[data-panel-link]");
 
     function show(slug, push) {
+      slug = slug || "color-picker"; // homepage shows the primary tool live
       var target = slug
         ? document.querySelector('[data-panel="' + slug + '"]')
         : overview;
