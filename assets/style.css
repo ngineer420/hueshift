@@ -321,7 +321,7 @@ p {
 /* ---------- hero ---------- */
 
 .hero {
-  padding: 64px 0 40px;
+  padding: 26px 0 18px;
   position: relative;
   overflow: hidden;
 }
@@ -363,7 +363,7 @@ p {
 }
 
 .hero h1 {
-  font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
   max-width: 16ch;
 }
 
@@ -373,7 +373,7 @@ p {
 }
 
 .hero .rail-row {
-  margin: 28px 0 6px;
+  margin: 14px 0 6px;
   padding: 14px 16px;
   background: var(--bg-raised);
   border: 1px solid var(--line);
