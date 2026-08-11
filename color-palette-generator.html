@@ -16,6 +16,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Palette Generator — Free, Private Color Tool | hueshift.net">
   <meta name="twitter:description" content="Generate complementary, analogous and triadic color palettes from a single base color. Copy each HEX value in one click.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Palette Generator \u2014 hueshift.net","url":"https://hueshift.net/color-palette-generator/","applicationCategory":"DesignApplication","operatingSystem":"Any (runs in browser)","description":"Generate complementary, analogous and triadic color palettes from a single base color. Copy each HEX value in one click.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"hueshift.net"}}</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7560786263587509" crossorigin="anonymous"></script>
@@ -66,6 +67,11 @@
       <button type="button" data-scheme="triadic" aria-pressed="false">Triadic</button>
     </div>
     <div class="palette-strip" id="pg-results"></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="pg-share-url" readonly aria-label="Shareable link to this palette">
+      <button type="button" class="copy-btn" data-copy-target="pg-share-url">Copy link</button>
+    </div>
         </div>
       </div>
     </section>
@@ -115,6 +121,7 @@
     <div class="wrap">
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
+        <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
         <li><a href="/terms/">Terms</a></li>
       </ul>

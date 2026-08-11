@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://hueshift.net/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/color-picker/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/color-converter/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/gradient-generator/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/color-palette-generator/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/contrast-checker/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/image-color-extractor/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/privacy/</loc><lastmod>2026-07-18</lastmod></url>
-  <url><loc>https://hueshift.net/terms/</loc><lastmod>2026-07-18</lastmod></url>
+  <url><loc>https://hueshift.net/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/color-picker/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/color-converter/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/gradient-generator/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/color-palette-generator/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/contrast-checker/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/image-color-extractor/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/privacy/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/terms/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/articles/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/articles/hex-rgb-hsl-which-color-format-to-use/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/articles/how-wcag-contrast-ratios-work/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/articles/color-harmony-complementary-analogous-triadic/</loc><lastmod>2026-08-10</lastmod></url>
+  <url><loc>https://hueshift.net/articles/why-gradients-go-grey-in-the-middle/</loc><lastmod>2026-08-10</lastmod></url>
 </urlset>

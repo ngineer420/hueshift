@@ -16,6 +16,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="hueshift.net — Free Browser-Only Color Tools for Designers & Developers">
   <meta name="twitter:description" content="Pick, convert, and generate colors, gradients, palettes and contrast checks — all client-side, all free, all offline-capable. Six color tools, zero uploads.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"hueshift.net","url":"https://hueshift.net/","description":"Pick, convert, and generate colors, gradients, palettes and contrast checks \u2014 all client-side, all free, all offline-capable. Six color tools, zero uploads."}</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7560786263587509" crossorigin="anonymous"></script>
@@ -126,8 +127,13 @@
       <div class="copy-row"><span class="label">CSS</span><span class="value" id="cp-css-value">background-color: #8b5cf6;</span><button type="button" class="copy-btn" data-copy-target="cp-css-value">Copy</button></div>
     </div>
     <button type="button" class="ghost-btn" id="cp-eyedropper" hidden style="margin-top:14px">🎯 Pick from screen</button>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cp-share-url" readonly aria-label="Shareable link to this color">
+      <button type="button" class="copy-btn" data-copy-target="cp-share-url">Copy link</button>
+    </div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/color-picker#how-it-works">Full guide &amp; FAQ for the Color Picker →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/color-picker/#how-it-works">Full guide &amp; FAQ for the Color Picker →</a></p>
       </div>
     </section>
     <section class="panel" data-panel="color-converter" data-title="Color Converter — hueshift.net" hidden>
@@ -155,8 +161,13 @@
       </div>
     </div>
     <p id="cc-error" hidden style="color:var(--sig-magenta);font-size:13px;margin-top:-8px">Couldn't parse that value — check the format and try again.</p>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cc-share-url" readonly aria-label="Shareable link to this conversion">
+      <button type="button" class="copy-btn" data-copy-target="cc-share-url">Copy link</button>
+    </div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/color-converter#how-it-works">Full guide &amp; FAQ for the Color Converter →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/color-converter/#how-it-works">Full guide &amp; FAQ for the Color Converter →</a></p>
       </div>
     </section>
     <section class="panel" data-panel="gradient-generator" data-title="Gradient Generator — hueshift.net" hidden>
@@ -182,8 +193,13 @@
     <div id="gg-stops-list" style="margin-bottom:12px"></div>
     <button type="button" class="ghost-btn" id="gg-add-stop">+ Add stop</button>
     <div class="copy-row" style="margin-top:18px"><span class="label">CSS</span><span class="value" id="gg-css-value"></span><button type="button" class="copy-btn" data-copy-target="gg-css-value">Copy</button></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="gg-share-url" readonly aria-label="Shareable link to this gradient">
+      <button type="button" class="copy-btn" data-copy-target="gg-share-url">Copy link</button>
+    </div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/gradient-generator#how-it-works">Full guide &amp; FAQ for the Gradient Generator →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/gradient-generator/#how-it-works">Full guide &amp; FAQ for the Gradient Generator →</a></p>
       </div>
     </section>
     <section class="panel" data-panel="color-palette-generator" data-title="Palette Generator — hueshift.net" hidden>
@@ -211,8 +227,13 @@
       <button type="button" data-scheme="triadic" aria-pressed="false">Triadic</button>
     </div>
     <div class="palette-strip" id="pg-results"></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="pg-share-url" readonly aria-label="Shareable link to this palette">
+      <button type="button" class="copy-btn" data-copy-target="pg-share-url">Copy link</button>
+    </div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/color-palette-generator#how-it-works">Full guide &amp; FAQ for the Palette Generator →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/color-palette-generator/#how-it-works">Full guide &amp; FAQ for the Palette Generator →</a></p>
       </div>
     </section>
     <section class="panel" data-panel="contrast-checker" data-title="Contrast Checker — hueshift.net" hidden>
@@ -249,8 +270,13 @@
     </div>
     <div class="ratio-display"><span class="num" id="cx-ratio-num">21.00:1</span><span>contrast ratio</span></div>
     <div class="verdicts" id="cx-verdicts"></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cx-share-url" readonly aria-label="Shareable link to this contrast pair">
+      <button type="button" class="copy-btn" data-copy-target="cx-share-url">Copy link</button>
+    </div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/contrast-checker#how-it-works">Full guide &amp; FAQ for the Contrast Checker →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/contrast-checker/#how-it-works">Full guide &amp; FAQ for the Contrast Checker →</a></p>
       </div>
     </section>
     <section class="panel" data-panel="image-color-extractor" data-title="Image Color Extractor — hueshift.net" hidden>
@@ -284,7 +310,7 @@
     <canvas id="ie-canvas" hidden></canvas>
     <div class="palette-strip" id="ie-results"></div>
         </div>
-        <p style="margin-top:16px;font-size:14px"><a href="/image-color-extractor#how-it-works">Full guide &amp; FAQ for the Image Color Extractor →</a></p>
+        <p style="margin-top:16px;font-size:14px"><a href="/image-color-extractor/#how-it-works">Full guide &amp; FAQ for the Image Color Extractor →</a></p>
       </div>
     </section>
   </main>
@@ -292,6 +318,7 @@
     <div class="wrap">
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
+        <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
         <li><a href="/terms/">Terms</a></li>
       </ul>
