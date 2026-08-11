@@ -16,6 +16,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Contrast Checker — Free, Private Color Tool | hueshift.net">
   <meta name="twitter:description" content="Check WCAG contrast ratio between two colors and see AA/AAA pass or fail for normal and large text, instantly and accurately.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Contrast Checker \u2014 hueshift.net","url":"https://hueshift.net/contrast-checker/","applicationCategory":"DesignApplication","operatingSystem":"Any (runs in browser)","description":"Check WCAG contrast ratio between two colors and see AA/AAA pass or fail for normal and large text, instantly and accurately.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"hueshift.net"}}</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7560786263587509" crossorigin="anonymous"></script>
@@ -75,6 +76,11 @@
     </div>
     <div class="ratio-display"><span class="num" id="cx-ratio-num">21.00:1</span><span>contrast ratio</span></div>
     <div class="verdicts" id="cx-verdicts"></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cx-share-url" readonly aria-label="Shareable link to this contrast pair">
+      <button type="button" class="copy-btn" data-copy-target="cx-share-url">Copy link</button>
+    </div>
         </div>
       </div>
     </section>
@@ -124,6 +130,7 @@
     <div class="wrap">
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
+        <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
         <li><a href="/terms/">Terms</a></li>
       </ul>

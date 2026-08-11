@@ -16,6 +16,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Color Converter — Free, Private Color Tool | hueshift.net">
   <meta name="twitter:description" content="Convert colors between HEX, RGB and HSL instantly. Type into any field and the other two update live. Free, private, works offline.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Color Converter \u2014 hueshift.net","url":"https://hueshift.net/color-converter/","applicationCategory":"DesignApplication","operatingSystem":"Any (runs in browser)","description":"Convert colors between HEX, RGB and HSL instantly. Type into any field and the other two update live. Free, private, works offline.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"hueshift.net"}}</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7560786263587509" crossorigin="anonymous"></script>
@@ -66,6 +67,11 @@
       </div>
     </div>
     <p id="cc-error" hidden style="color:var(--sig-magenta);font-size:13px;margin-top:-8px">Couldn't parse that value — check the format and try again.</p>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cc-share-url" readonly aria-label="Shareable link to this conversion">
+      <button type="button" class="copy-btn" data-copy-target="cc-share-url">Copy link</button>
+    </div>
         </div>
       </div>
     </section>
@@ -115,6 +121,7 @@
     <div class="wrap">
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
+        <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
         <li><a href="/terms/">Terms</a></li>
       </ul>

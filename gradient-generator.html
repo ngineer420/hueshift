@@ -16,6 +16,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Gradient Generator — Free, Private Color Tool | hueshift.net">
   <meta name="twitter:description" content="Build linear and radial CSS gradients visually. Add color stops, set the angle, and copy production-ready background CSS instantly.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Gradient Generator \u2014 hueshift.net","url":"https://hueshift.net/gradient-generator/","applicationCategory":"DesignApplication","operatingSystem":"Any (runs in browser)","description":"Build linear and radial CSS gradients visually. Add color stops, set the angle, and copy production-ready background CSS instantly.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"hueshift.net"}}</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7560786263587509" crossorigin="anonymous"></script>
@@ -64,6 +65,11 @@
     <div id="gg-stops-list" style="margin-bottom:12px"></div>
     <button type="button" class="ghost-btn" id="gg-add-stop">+ Add stop</button>
     <div class="copy-row" style="margin-top:18px"><span class="label">CSS</span><span class="value" id="gg-css-value"></span><button type="button" class="copy-btn" data-copy-target="gg-css-value">Copy</button></div>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="gg-share-url" readonly aria-label="Shareable link to this gradient">
+      <button type="button" class="copy-btn" data-copy-target="gg-share-url">Copy link</button>
+    </div>
         </div>
       </div>
     </section>
@@ -113,6 +119,7 @@
     <div class="wrap">
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
+        <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
         <li><a href="/terms/">Terms</a></li>
       </ul>

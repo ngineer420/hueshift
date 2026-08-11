@@ -10,6 +10,58 @@
 
   var CM = window.ColorMath;
 
+  /* ============================ SHAREABLE STATE ============================
+   * On a color site the output *is* the artifact, so every tool encodes what
+   * it is currently showing into a link you can paste into a review, a
+   * ticket, or a message. State goes in ordinary query params on the tool's
+   * own clean URL — never on whatever page you happen to be looking at — so
+   * a link built from the homepage panel still opens the standalone tool.
+   */
+
+  var qsp = new URLSearchParams(window.location.search);
+
+  function setShareUrl(inputId, slug, params) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    var parts = [];
+    Object.keys(params).forEach(function (key) {
+      var value = params[key];
+      if (value === "" || value == null) return;
+      // Commas and colons are legal unencoded in a query string, and
+      // "?stops=ff3e7f:0,8b5cf6:100" is a link a person can read and edit
+      // by hand — which is half the point of having one.
+      parts.push(
+        key + "=" + encodeURIComponent(String(value)).replace(/%2C/g, ",").replace(/%3A/g, ":")
+      );
+    });
+    input.value =
+      window.location.origin + "/" + slug + "/" + (parts.length ? "?" + parts.join("&") : "");
+  }
+
+  // Accepts "8b5cf6" or "#8b5cf6" — the bare form keeps the shared link
+  // free of %23, and pasting a hex straight off a design tool still works.
+  function paramHex(name, fallback) {
+    var raw = qsp.get(name);
+    if (!raw) return fallback;
+    var hex = raw.charAt(0) === "#" ? raw : "#" + raw;
+    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : fallback;
+  }
+
+  function paramInt(name, min, max, fallback) {
+    var n = Number(qsp.get(name));
+    if (!isFinite(n) || qsp.get(name) === null || qsp.get(name) === "") return fallback;
+    return Math.max(min, Math.min(max, Math.round(n)));
+  }
+
+  function paramOneOf(name, allowed, fallback) {
+    var raw = qsp.get(name);
+    return allowed.indexOf(raw) !== -1 ? raw : fallback;
+  }
+
+  function bare(hex) {
+    return hex.replace("#", "").toLowerCase();
+  }
+
   /* ============================== THEME ============================== */
   // The no-flash "apply stored theme before paint" step lives inline in
   // <head> on every page. This just wires the visible toggle button.
@@ -254,6 +306,8 @@
       document.getElementById("cp-hue-value").textContent = Math.round(hsl.h) + "°";
       document.getElementById("cp-sat-value").textContent = Math.round(hsl.s) + "%";
       document.getElementById("cp-light-value").textContent = Math.round(hsl.l) + "%";
+
+      setShareUrl("cp-share-url", "color-picker", { c: bare(hex) });
     }
 
     colorInput.addEventListener("input", function () {
@@ -280,7 +334,7 @@
       });
     }
 
-    render("#8b5cf6", false);
+    render(paramHex("c", "#8b5cf6"), false);
   }
 
   /* ============================ CONVERTER (cc-) ============================ */
@@ -302,6 +356,7 @@
           CM.round(hsl.h, 0) + ", " + CM.round(hsl.s, 0) + "%, " + CM.round(hsl.l, 0) + "%";
       preview.style.background = hex;
       error.hidden = true;
+      setShareUrl("cc-share-url", "color-converter", { c: bare(hex) });
     }
 
     function fail() {
@@ -326,7 +381,7 @@
       else fail();
     });
 
-    setAll(CM.hexToRgb("#2fe6d9"));
+    setAll(CM.hexToRgb(paramHex("c", "#2fe6d9")));
   }
 
   /* ============================ GRADIENT (gg-) ============================ */
@@ -390,6 +445,16 @@
       preview.style.background = css;
       cssValue.textContent = "background: " + css + ";";
 
+      setShareUrl("gg-share-url", "gradient-generator", {
+        type: type.value,
+        angle: type.value === "radial" ? null : angle.value,
+        stops: stops
+          .map(function (s) {
+            return bare(s.color) + ":" + s.pos;
+          })
+          .join(","),
+      });
+
       var removeBtns = list.querySelectorAll(".stop-row button");
       removeBtns.forEach(function (b) {
         b.disabled = rows.length <= 2;
@@ -419,8 +484,35 @@
     });
     type.addEventListener("change", render);
 
-    makeStop("#ff3e7f", 0);
-    makeStop("#8b5cf6", 100);
+    // A shared gradient restores its type, angle and every stop. Anything
+    // malformed in the link falls back to the default two-stop gradient
+    // rather than rendering a broken one.
+    var sharedStops = (qsp.get("stops") || "")
+      .split(",")
+      .map(function (chunk) {
+        var bits = chunk.split(":");
+        var rgb = CM.hexToRgb(bits[0].charAt(0) === "#" ? bits[0] : "#" + bits[0]);
+        var pos = Number(bits[1]);
+        if (!rgb || !isFinite(pos)) return null;
+        return {
+          hex: CM.rgbToHex(rgb.r, rgb.g, rgb.b),
+          pos: Math.max(0, Math.min(100, Math.round(pos))),
+        };
+      })
+      .filter(Boolean);
+
+    type.value = paramOneOf("type", ["linear", "radial"], "linear");
+    angle.value = paramInt("angle", 0, 360, Number(angle.value) || 90);
+    angleValue.textContent = angle.value + "°";
+
+    if (sharedStops.length >= 2) {
+      sharedStops.forEach(function (s) {
+        makeStop(s.hex, s.pos);
+      });
+    } else {
+      makeStop("#ff3e7f", 0);
+      makeStop("#8b5cf6", 100);
+    }
     render();
   }
 
@@ -432,7 +524,7 @@
     var schemeBtns = document.querySelectorAll("#pg-scheme-tabs button");
     var results = document.getElementById("pg-results");
 
-    var scheme = "complementary";
+    var scheme = paramOneOf("scheme", ["complementary", "analogous", "triadic"], "complementary");
 
     function render() {
       var hex = baseInput.value;
@@ -440,6 +532,11 @@
       if (!rgb) return;
       var hsl = CM.rgbToHsl(rgb.r, rgb.g, rgb.b);
       var swatches = CM.paletteScheme(hsl, scheme);
+
+      setShareUrl("pg-share-url", "color-palette-generator", {
+        base: bare(hex),
+        scheme: scheme,
+      });
 
       results.innerHTML = "";
       swatches.forEach(function (s, i) {
@@ -490,6 +587,11 @@
       });
     });
 
+    baseInput.value = paramHex("base", baseInput.value);
+    baseHexInput.value = baseInput.value;
+    schemeBtns.forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-scheme") === scheme));
+    });
     render();
   }
 
@@ -516,6 +618,11 @@
       var ratio = CM.contrastRatio(fgRgb, bgRgb);
       var v = CM.contrastVerdict(ratio);
       ratioNum.textContent = ratio.toFixed(2) + ":1";
+
+      setShareUrl("cx-share-url", "contrast-checker", {
+        fg: bare(fg.value),
+        bg: bare(bg.value),
+      });
 
       var rows = [
         ["AA · normal text", v.aaNormal, "4.5:1"],
@@ -571,6 +678,10 @@
       render();
     });
 
+    fg.value = paramHex("fg", fg.value);
+    bg.value = paramHex("bg", bg.value);
+    fgHex.value = fg.value;
+    bgHex.value = bg.value;
     render();
   }
 
