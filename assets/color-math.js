@@ -228,9 +228,142 @@
     }
   }
 
+  /* ------------------------- tints, shades and tones -------------------------
+   *
+   * Three different operations that get used interchangeably and are not
+   * interchangeable:
+   *
+   *   tint   mix toward white   — lighter, same hue
+   *   shade  mix toward black   — darker, same hue
+   *   tone   mix toward grey    — same lightness, less saturation
+   *
+   * A tone is the one people get wrong. Reaching for "muted" and turning the
+   * lightness down gives a shade, not a tone: the colour goes dark instead of
+   * going quiet. Reducing saturation at fixed HSL lightness is exactly mixing
+   * with the grey of the same lightness, which is what a tone is.
+   */
+
+  function mixChannel(a, b, t) {
+    return clamp(Math.round(a + (b - a) * t), 0, 255);
+  }
+
+  /** Mix two {r,g,b} by `t` (0 = all of a, 1 = all of b). */
+  function mixRgb(a, b, t) {
+    return {
+      r: mixChannel(a.r, b.r, t),
+      g: mixChannel(a.g, b.g, t),
+      b: mixChannel(a.b, b.b, t),
+    };
+  }
+
+  var WHITE = { r: 255, g: 255, b: 255 };
+  var BLACK = { r: 0, g: 0, b: 0 };
+
+  function towards(rgb, target, steps) {
+    var out = [];
+    for (var i = 1; i <= steps; i++) {
+      // Stop short of the target: the last step of a ten-step run to white is
+      // white, and a swatch of white is not a tint of anything.
+      var t = (i / (steps + 1));
+      out.push({ amount: round(t * 100, 0), rgb: mixRgb(rgb, target, t) });
+    }
+    return out;
+  }
+
+  function tints(rgb, steps) {
+    return towards(rgb, WHITE, steps || 10);
+  }
+
+  function shades(rgb, steps) {
+    return towards(rgb, BLACK, steps || 10);
+  }
+
+  function tones(rgb, steps) {
+    var count = steps || 10;
+    var base = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    var out = [];
+    for (var i = 1; i <= count; i++) {
+      var t = i / (count + 1);
+      out.push({
+        amount: round(t * 100, 0),
+        rgb: hslToRgb(base.h, base.s * (1 - t), base.l),
+      });
+    }
+    return out;
+  }
+
+  /* ------------------------------ the 50-950 ramp ------------------------------
+   *
+   * The scale people paste into a config. Naive versions space it evenly in
+   * HSL lightness, which is why they come out wrong at both ends: HSL
+   * lightness is not perceptual, so an even split puts most of the visible
+   * difference in the dark half and leaves 50, 100 and 200 nearly identical.
+   *
+   * These targets are CIE L* instead — the lightness axis built so that equal
+   * numbers are equal perceived steps — and each stop is solved for by
+   * searching HSL lightness until the result hits its target. The hue is held
+   * exactly; saturation is eased off at the pale end, where full saturation
+   * both looks fluorescent and cannot reach the target L* at all.
+   */
+
+  var RAMP_TARGETS = [
+    { step: 50, L: 97, sat: 0.55 },
+    { step: 100, L: 94, sat: 0.68 },
+    { step: 200, L: 87, sat: 0.82 },
+    { step: 300, L: 78, sat: 0.92 },
+    { step: 400, L: 67, sat: 1.0 },
+    { step: 500, L: 56, sat: 1.0 },
+    { step: 600, L: 47, sat: 1.0 },
+    { step: 700, L: 38, sat: 0.98 },
+    { step: 800, L: 29, sat: 0.94 },
+    { step: 900, L: 21, sat: 0.9 },
+    { step: 950, L: 14, sat: 0.86 },
+  ];
+
+  /** Perceptual lightness L* (0-100) of an {r,g,b}, from its WCAG luminance. */
+  function perceptualLightness(rgb) {
+    var y = relativeLuminance(rgb.r, rgb.g, rgb.b);
+    return y > 0.008856 ? 116 * Math.pow(y, 1 / 3) - 16 : 903.3 * y;
+  }
+
+  /**
+   * The 50-950 scale for a base colour.
+   *
+   * Binary search rather than a formula because there is no closed form: L*
+   * runs through the sRGB transfer curve and the luminance weights, so the
+   * only honest way to land on 67 exactly is to look for it. Twenty-four
+   * iterations gets well inside a rounding step and costs nothing.
+   */
+  function rampScale(rgb) {
+    var base = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    return RAMP_TARGETS.map(function (target) {
+      var sat = clamp(base.s * target.sat, 0, 100);
+      var lo = 0, hi = 100, mid = 50, out = null;
+      for (var i = 0; i < 24; i++) {
+        mid = (lo + hi) / 2;
+        out = hslToRgb(base.h, sat, mid);
+        if (perceptualLightness(out) < target.L) lo = mid;
+        else hi = mid;
+      }
+      return {
+        step: target.step,
+        rgb: out,
+        hex: rgbToHex(out.r, out.g, out.b),
+        lightness: round(perceptualLightness(out), 1),
+      };
+    });
+  }
+
   return {
     clamp: clamp,
     round: round,
+    mixRgb: mixRgb,
+    tints: tints,
+    shades: shades,
+    tones: tones,
+    rampScale: rampScale,
+    perceptualLightness: perceptualLightness,
+    RAMP_TARGETS: RAMP_TARGETS,
     hexToRgb: hexToRgb,
     rgbToHex: rgbToHex,
     rgbToHsl: rgbToHsl,
