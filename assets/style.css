@@ -131,12 +131,12 @@ p {
 
 /* ---------- header / nav ---------- */
 
+/* Deliberately not sticky, and neither is the toolbar below it: nothing in the
+   chrome may overlay an AdSense anchor unit or an Auto-ads in-content slot.
+   Wordmark and one icon button, no links and no swatch rail, which is what
+   brings this bar down from 121px on a phone to 47px. */
 .site-header {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  backdrop-filter: blur(14px);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
 
@@ -144,9 +144,24 @@ p {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  /* Budgeted: 8 + 36 (the toggle) + 8 + the 1px rule is a 53px bar, which with
+     the 45px toolbar keeps the closed chrome at 98px on every page. */
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--bg);
+  padding: 10px 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-link:focus { left: 0; }
 
 .wordmark {
   font-family: var(--font-display);
@@ -180,42 +195,6 @@ p {
   }
 }
 
-.tool-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  flex: 1;
-}
-
-.tool-nav a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 11px;
-  border-radius: 999px;
-  color: var(--fg-dim);
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-}
-
-.tool-nav a:hover {
-  color: var(--fg);
-  border-color: var(--line);
-}
-
-.tool-nav a[aria-current="page"] {
-  color: var(--bg);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
 .header-controls {
   display: flex;
   align-items: center;
@@ -241,37 +220,228 @@ p {
   height: 18px;
 }
 
-.nav-toggle {
-  display: none;
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--bg-raised);
-  color: var(--fg);
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
+/* ==========================================================================
+   toolbar v1 — the portfolio navigation pattern.
+   Spec: github.com/ngineer420/ngineer420.github.io/issues/13
+
+   Copied verbatim from the photoshrink pilot. Everything site-specific is the
+   eight custom properties declared on `.toolbar` below; remap those to this
+   site's tokens and nothing else needs touching. The silhouette is shared, the
+   palette and the type are not.
+
+   Structure: one <nav class="toolbar">, a direct child of <body> immediately
+   after </header>. A <details> trigger pinned left that never scrolls, and a
+   single non-wrapping row of tool chips that does. Never sticky.
+   ========================================================================== */
+
+.toolbar {
+  /* ---- the only site-owned values in this block ---- */
+  --tb-bg: var(--bg);
+  --tb-bg-elev: var(--bg-raised);
+  --tb-border: var(--line);
+  --tb-border-soft: var(--line);
+  --tb-text: var(--fg);
+  --tb-text-dim: var(--fg-dim);
+  --tb-accent: var(--accent);
+  --tb-focus: var(--accent);
+
+  /* A stacking context, so the sheet lands above the tool's own positioned
+     bits without a z-index arms race inside it. */
+  position: relative; z-index: 40;
+  display: flex; align-items: stretch;
+  /* 44px of content plus the 1px rule. box-sizing is border-box, so a flat
+     44px here leaves the rail a 43px content box, the 44px chips overflow it
+     by a pixel and the 2px active underline gets clipped to 1px. */
+  height: 45px;
+  background: var(--tb-bg);
+  border-bottom: 1px solid var(--tb-border-soft);
+}
+/* The bar is full-bleed so its rule spans the window, but its contents belong
+   in the same column as the header and <main>. Full-bleed is kept below 720px,
+   where the gutter would come straight out of the rail's scrollable width and
+   the fades already handle the edges. */
+@media (min-width: 720px) {
+  .toolbar { padding-inline: max(24px, calc((100% - 1080px) / 2 + 24px)); }
 }
 
-@media (max-width: 880px) {
-  .nav-toggle {
-    display: grid;
-    place-items: center;
+/* ---- the trigger: labelled, counted, and never collapses to an icon ---- */
+.tb-menu { position: relative; flex: 0 0 auto; }
+.tb-trigger {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 14px;
+  white-space: nowrap; cursor: pointer; list-style: none;
+  font-size: 14.5px; font-weight: 700; color: var(--tb-text);
+  border-right: 1px solid var(--tb-border-soft);
+}
+.tb-trigger::-webkit-details-marker { display: none; } /* Safari */
+.tb-trigger::marker { content: ""; }
+.tb-trigger:hover { color: var(--tb-accent); }
+.tb-glyph { color: var(--tb-accent); font-size: 15px; line-height: 1; }
+
+/* ---- the rail: one row, always. Wrapping is what produced every ragged
+   multi-row header in the audit; nowrap makes those faults impossible. ---- */
+.tb-rail {
+  /* The centre-on-current JS reads `current.offsetLeft` and treats it as an
+     offset inside this scroller. Without a position here the nearest
+     positioned ancestor is `.toolbar`, so that figure also carries the
+     trigger's width and the rail over-scrolls by it — the current chip lands
+     with its first letters under the left fade, which is the clipped label
+     this pattern exists to prevent. */
+  position: relative;
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-wrap: nowrap; gap: 0;
+  margin: 0; padding: 0; list-style: none;
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;  /* a swipe past the end is not a back-nav */
+  scroll-padding-inline: 24px;     /* Tab must not park a chip under the fade */
+  scrollbar-width: none;
+  /* The right fade is ON by default and JS turns it off once it can prove the
+     rail is scrolled to its end. Defaulting it off would mean a JS-disabled
+     visitor gets a label hard-clipped mid-word, which is the one thing this
+     pattern exists to stop. It costs nothing when the rail does not scroll,
+     because the rail is a flex item that stretches: the last chip only reaches
+     the right edge when there is something behind it. */
+  --f0: 0px; --f1: 24px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--f0),
+    #000 calc(100% - var(--f1)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--f0),
+    #000 calc(100% - var(--f1)), transparent 100%);
+}
+.tb-rail::-webkit-scrollbar { display: none; } /* the fade is the affordance */
+.tb-rail.can-l { --f0: 24px; }
+.tb-rail.js-on:not(.can-r) { --f1: 0px; }
+.tb-rail > li { flex: 0 0 auto; }
+.tb-rail a {
+  display: flex; align-items: center; min-height: 44px; padding: 0 12px;
+  white-space: nowrap; text-decoration: none;
+  font-size: 14.5px; font-weight: 600; color: var(--tb-text-dim);
+  box-shadow: inset 0 -2px 0 transparent;
+}
+/* Hover changes colour only, so the scroller never reflows under the cursor. */
+.tb-rail a:hover { color: var(--tb-text); text-decoration: none; }
+.tb-rail a[aria-current] {
+  color: var(--tb-text); font-weight: 800;
+  box-shadow: inset 0 -2px 0 var(--tb-accent);
+}
+
+/* outline-offset is negative so the ring is not clipped by the scroller. */
+.tb-trigger:focus-visible,
+.tb-rail a:focus-visible,
+.tb-sheet a:focus-visible {
+  outline: 2px solid var(--tb-focus); outline-offset: -2px;
+}
+
+/* ---- the sheet: a disclosure, not a modal. Focus is never trapped. ---- */
+.tb-sheet {
+  position: absolute; top: 100%; left: 0; z-index: 2;
+  width: min(680px, 92vw); max-height: min(70vh, 520px);
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--tb-bg-elev);
+  border: 1px solid var(--tb-border);
+  /* Radius and shadow are site-owned: a hard-edged idiom reads wrong with a
+     soft drop shadow and a 12px corner. Structure stays identical portfolio-
+     wide; only these two tokens move. */
+  border-radius: var(--tb-sheet-radius, 0 0 12px 12px);
+  box-shadow: var(--tb-sheet-shadow, 0 18px 40px -20px rgba(0, 0, 0, .5));
+  padding: 14px 4px;
+  columns: 2; column-gap: 24px;
+}
+/* At <= 8 destinations the sheet renders one flat list and the columns move
+   onto it; group headings are noise at that size. */
+.tb-sheet.is-flat { columns: 1; }
+.tb-sheet.is-flat ul { columns: 2; column-gap: 24px; }
+.tb-sheet ul { margin: 0 0 12px; padding: 0; list-style: none; break-inside: avoid; }
+.tb-sheet li { break-inside: avoid; }
+.tb-sheet a {
+  display: flex; align-items: center; min-height: 36px; padding: 0 14px;
+  font-size: 14.5px; text-decoration: none; color: var(--tb-text-dim);
+  border-left: 3px solid transparent; /* reserved, so the current item never shifts */
+}
+.tb-sheet a:hover { color: var(--tb-text); text-decoration: none; }
+.tb-sheet a[aria-current] {
+  color: var(--tb-text); font-weight: 800; border-left-color: var(--tb-accent);
+}
+/* <p>, not <h2>: chrome headings would pollute the outline of an SEO page. */
+.tb-grouplabel {
+  margin: 0 0 4px; padding: 0 14px;
+  font-size: 12px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--tb-text-dim);
+}
+/* The one route from the chrome to a tier-2 family. */
+.tb-hub {
+  column-span: all; break-inside: avoid;
+  margin: 2px 0 0; padding: 10px 14px 0;
+  border-top: 1px solid var(--tb-border-soft);
+}
+.tb-hub a {
+  padding: 0; border-left: 0; min-height: 36px;
+  color: var(--tb-accent); font-weight: 700;
+}
+
+/* ---- mobile: full-bleed sheet, scrim, short trigger label ---- */
+.tb-scrim { display: none; }
+@media (max-width: 719px) {
+  .tb-menu { position: static; }
+  /* No multicol at all on a phone, not even `columns: 1`. A multicol box with
+     a max-height fragments into *extra* columns laid out sideways, so on a
+     grouped sheet the last group and the hub link were rendered off the right
+     edge with a blank band where they should have been — `overflow-y` cannot
+     scroll to content that overflowed inline. A plain block scrolls. */
+  .tb-sheet, .tb-sheet.is-flat ul {
+    columns: auto;
   }
-  .tool-nav {
-    display: none;
-    order: 5;
-    width: 100%;
-    flex-basis: 100%;
-    padding-top: 10px;
+  .tb-sheet {
+    left: 0; right: 0; width: auto;
+    border-width: 1px 0; border-radius: 0;
   }
-  .site-header .wrap {
-    flex-wrap: wrap;
-  }
-  .tool-nav.is-open {
-    display: flex;
+  .tb-sheet a { min-height: 44px; padding: 0 16px; }
+  /* Anchored to the bar rather than the viewport, so it cannot cover the
+     trigger — with JS off, tapping the trigger again is the way out and there
+     must be nothing on top of it. Pure CSS, so it works with JS off too. */
+  .tb-menu[open] ~ .tb-scrim {
+    display: block; position: absolute; top: 100%; left: 0; right: 0;
+    height: 100vh; z-index: 1; background: rgba(0, 0, 0, .42);
   }
 }
+@media (max-width: 399px) {
+  .tb-label-long { display: none; } /* "All 13 sheets" -> "All 13"; the
+                                       accessible name keeps the full string */
+}
+
+/* ---- tier-2 sibling chips, inside the tool's own surface ----
+   A color family is a parameter of the shades generator, not a peer of the
+   other seven tools, so the switcher lives here rather than in the toolbar.
+   Real links, never intercepted: these pages differ by more than a preset. */
+.chip-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; }
+.chip-row-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--fg-dim);
+}
+.chip-row ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chip-row a.chip-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip-row a.chip-link:hover { color: var(--fg); border-color: var(--accent); }
+.chip-row a.chip-link[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+@media (max-width: 640px) { .chip-row a.chip-link { min-height: 38px; } }
 
 /* ---------- swatch rail (signature element) ---------- */
 
