@@ -814,6 +814,170 @@
     });
   }
 
+  /* ==================== SHADES GENERATOR (cs-) ==================== */
+  /* Tints, shades and tones from one base colour, plus the 50-950 scale.
+     The maths lives in color-math.js; this is only wiring. */
+
+  function initShades() {
+    var picker = document.getElementById("cs-color");
+    if (!picker) return;
+    var hexInput = document.getElementById("cs-hex");
+    var strips = {
+      tints: document.getElementById("cs-tints"),
+      shades: document.getElementById("cs-shades"),
+      tones: document.getElementById("cs-tones"),
+      ramp: document.getElementById("cs-ramp"),
+    };
+    var outHex = document.getElementById("cs-out-hex");
+    var outVars = document.getElementById("cs-out-vars");
+    var outRamp = document.getElementById("cs-out-ramp");
+
+    function swatch(hex, label, sub) {
+      var el = document.createElement("div");
+      el.className = "shade-chip";
+      el.innerHTML =
+        '<span class="shade-swatch" style="background:' + hex + '"></span>' +
+        '<span class="shade-meta"><b>' + label + "</b><span>" + hex + "</span>" +
+        (sub ? "<span>" + sub + "</span>" : "") + "</span>";
+      // The swatch is the copy button: on a page that is nothing but swatches,
+      // a row of little buttons beside them would be noise.
+      el.tabIndex = 0;
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", "Copy " + hex);
+      function copy() { copyText(hex, el); }
+      el.addEventListener("click", copy);
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); copy(); }
+      });
+      return el;
+    }
+
+    function render(hex) {
+      var rgb = CM.hexToRgb(hex);
+      if (!rgb) return;
+      var tints = CM.tints(rgb);
+      var shades = CM.shades(rgb);
+      var tones = CM.tones(rgb);
+      var ramp = CM.rampScale(rgb);
+      var toHex = function (entry) { return CM.rgbToHex(entry.rgb.r, entry.rgb.g, entry.rgb.b); };
+
+      [["tints", tints], ["shades", shades], ["tones", tones]].forEach(function (pair) {
+        var host = strips[pair[0]];
+        if (!host) return;
+        host.innerHTML = "";
+        // A tone is saturation removed, so a grey has none: rather than
+        // print ten identical swatches with ten different percentages on
+        // them, say why the row is empty.
+        if (pair[0] === "tones" && CM.rgbToHsl(rgb.r, rgb.g, rgb.b).s < 2) {
+          host.innerHTML =
+            '<p class="strip-note">This base has no saturation to remove, so every tone lands back on the colour itself. Tones only mean something once there is some chroma in the base.</p>';
+          return;
+        }
+        pair[1].forEach(function (entry) {
+          host.appendChild(swatch(toHex(entry), entry.amount + "%", null));
+        });
+      });
+
+      if (strips.ramp) {
+        strips.ramp.innerHTML = "";
+        ramp.forEach(function (entry) {
+          strips.ramp.appendChild(swatch(entry.hex, String(entry.step), "L* " + entry.lightness));
+        });
+      }
+
+      var all = tints.map(toHex).reverse().concat([hex.toLowerCase()], shades.map(toHex));
+      if (outHex) outHex.value = all.join(", ");
+      if (outVars) {
+        outVars.value = ramp.map(function (e) {
+          return "  --color-" + e.step + ": " + e.hex + ";";
+        }).join("\n");
+      }
+      if (outRamp) {
+        outRamp.value = ramp.map(function (e) { return e.step + ": " + e.hex; }).join("\n");
+      }
+      setShareUrl("cs-share-url", "color-shades-generator", { hex: bare(hex) });
+    }
+
+    function setHex(hex, from) {
+      hex = hex.toLowerCase();
+      if (from !== "picker") picker.value = hex;
+      if (from !== "text") hexInput.value = hex;
+      render(hex);
+    }
+
+    picker.addEventListener("input", function () { setHex(picker.value, "picker"); });
+    hexInput.addEventListener("input", function () {
+      var rgb = CM.hexToRgb(hexInput.value);
+      if (rgb) setHex(CM.rgbToHex(rgb.r, rgb.g, rgb.b), "text");
+    });
+
+    setHex(paramHex("hex", picker.value), null);
+  }
+
+  /* ==================== COLOR NAME FINDER (cn-) ==================== */
+
+  function initColorNameFinder() {
+    var picker = document.getElementById("cn-color");
+    if (!picker || !window.ColorNames) return;
+    var CN = window.ColorNames;
+    var hexInput = document.getElementById("cn-hex");
+    var result = document.getElementById("cn-result");
+    var list = document.getElementById("cn-list");
+
+    function card(match, rgb) {
+      var contrastWhite = CM.contrastRatio(match, { r: 255, g: 255, b: 255 });
+      var contrastBlack = CM.contrastRatio(match, { r: 0, g: 0, b: 0 });
+      return (
+        '<div class="name-hit">' +
+        '<span class="name-swatch" style="background:' + match.hex + '"></span>' +
+        '<div class="name-body">' +
+        "<h3>" + match.name + "</h3>" +
+        '<p class="name-verdict">' +
+        (match.exact
+          ? "An exact match: that hex is this colour."
+          : match.distance < 2
+            ? "Visually identical — a Lab difference of " + match.distance.toFixed(1) + " is below what an eye can separate."
+            : match.distance < 10
+              ? "Close: a Lab difference of " + match.distance.toFixed(1) + ", near enough to call it by this name."
+              : "The nearest name, but not a close one — a Lab difference of " + match.distance.toFixed(1) + " is a visibly different colour.") +
+        "</p>" +
+        '<p class="name-facts">' + match.hex + " · " + CM.formatRgb(match.r, match.g, match.b) +
+        " · " + contrastWhite.toFixed(2) + ":1 on white · " + contrastBlack.toFixed(2) + ":1 on black</p>" +
+        "</div></div>"
+      );
+    }
+
+    function render(hex) {
+      var rgb = CM.hexToRgb(hex);
+      if (!rgb) return;
+      var matches = CN.nearest(rgb, 6);
+      result.innerHTML = card(matches[0], rgb);
+      list.innerHTML = matches.slice(1).map(function (m) {
+        return (
+          '<li><span class="name-swatch small" style="background:' + m.hex + '"></span>' +
+          "<b>" + m.name + "</b><span>" + m.hex + "</span>" +
+          "<span>Δ" + m.distance.toFixed(1) + "</span></li>"
+        );
+      }).join("");
+      setShareUrl("cn-share-url", "color-name-finder", { hex: bare(hex) });
+    }
+
+    function setHex(hex, from) {
+      hex = hex.toLowerCase();
+      if (from !== "picker") picker.value = hex;
+      if (from !== "text") hexInput.value = hex;
+      render(hex);
+    }
+
+    picker.addEventListener("input", function () { setHex(picker.value, "picker"); });
+    hexInput.addEventListener("input", function () {
+      var rgb = CM.hexToRgb(hexInput.value);
+      if (rgb) setHex(CM.rgbToHex(rgb.r, rgb.g, rgb.b), "text");
+    });
+
+    setHex(paramHex("hex", picker.value), null);
+  }
+
   /* ============================== BOOT ============================== */
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
@@ -827,5 +991,7 @@
     initPalette();
     initContrast();
     initExtractor();
+    initShades();
+    initColorNameFinder();
   });
 })();
