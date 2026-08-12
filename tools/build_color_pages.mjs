@@ -28,7 +28,7 @@
  * disagree about the same pair of colours.
  */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from "node:fs"
-import { dirname, join, relative } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createRequire } from "node:module"
 
@@ -51,16 +51,20 @@ const check = process.argv.includes("--check")
 // and navigate normally. A data-panel-link pointing at a panel that does not
 // exist is worse than none: initPanelSwitching intercepts the click, finds
 // nothing, and quietly shows the overview instead, so the link looks dead.
+// The portfolio toolbar's tier-1 list (ngineer420.github.io#13, with the
+// errata). "Home" is gone from it: the wordmark is the home link, and the spec
+// does not spend a rail or sheet slot on it. Order is rail order, and the rail
+// is capped at eight — which is exactly what this site has.
+//   href, rail chip (<= 18 chars), sheet anchor text, homepage panel
 const NAV = [
-  ["/", "Home", ""],
-  ["/color-picker/", "Color Picker", "color-picker"],
-  ["/color-converter/", "Color Converter", "color-converter"],
-  ["/gradient-generator/", "Gradient Generator", "gradient-generator"],
-  ["/color-palette-generator/", "Palette Generator", "color-palette-generator"],
-  ["/contrast-checker/", "Contrast Checker", "contrast-checker"],
-  ["/color-shades-generator/", "Shades Generator", null],
-  ["/color-name-finder/", "Color Names", null],
-  ["/image-color-extractor/", "Image Color Extractor", "image-color-extractor"],
+  ["/color-picker/", "Picker", "Color Picker", "color-picker"],
+  ["/color-converter/", "Converter", "Color Converter", "color-converter"],
+  ["/gradient-generator/", "Gradient", "Gradient Generator", "gradient-generator"],
+  ["/color-palette-generator/", "Palette", "Color Palette Generator", "color-palette-generator"],
+  ["/contrast-checker/", "Contrast", "Contrast Checker", "contrast-checker"],
+  ["/color-shades-generator/", "Shades", "Color Shades Generator", null],
+  ["/color-name-finder/", "Color Names", "Color Name Finder", null],
+  ["/image-color-extractor/", "From Image", "Image Color Extractor", "image-color-extractor"],
 ]
 
 const FAMILIES = [
@@ -86,12 +90,74 @@ const NO_FLASH =
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 const j = s => JSON.stringify(s)
 
-function navList(current) {
-  return NAV.map(([href, label, slug]) => {
+/* The shades-of-* pages are tier 2: the shades generator with a family baked
+   in. They never appear in the rail or the sheet body — they get one hub link
+   at the bottom of the sheet, plus real <a href> sibling chips inside the
+   generator's own control panel, where a family is a parameter and not a peer
+   of the other seven tools. */
+const SHADES_PARENT = "/color-shades-generator/"
+const SHADES_VARIANTS = [
+  [SHADES_PARENT, "Any color"],
+  ...FAMILIES.map(f => [`/shades-of-${f.key}/`, f.name]),
+]
+const OWNED = new Set(SHADES_VARIANTS.slice(1).map(([href]) => href))
+
+/* aria-current="page" is reserved for a link that really points at the page
+   being rendered. The generator whose tier-2 variant is the current page gets
+   aria-current="true" — "the current item in this set" — which is what stops
+   the rail rendering unselected on all ten shades pages without announcing a
+   link to somewhere else as the current page. */
+function currentMark(href, current) {
+  if (href === current) return ' aria-current="page"'
+  if (href === SHADES_PARENT && OWNED.has(current)) return ' aria-current="true"'
+  return ""
+}
+
+function toolbar(current) {
+  const rail = NAV.map(([href, label, , slug]) => {
     const panel = slug === null ? "" : ` data-panel-link="${slug}"`
-    const isCurrent = slug === null ? href === current : slug === current
-    return `      <li><a href="${href}"${panel}${isCurrent ? ' aria-current="page"' : ""}>${label}</a></li>`
+    return `      <li><a href="${href}"${panel}${currentMark(href, current)}>${label}</a></li>`
   }).join("\n")
+  // Flat, not grouped: eight destinations is where group headings become noise,
+  // and the spec renders flat at eight or fewer however the per-site issue
+  // sketched it.
+  const sheet = NAV.map(([href, , long, slug]) => {
+    const panel = slug === null ? "" : ` data-panel-link="${slug}"`
+    return `        <li><a href="${href}"${panel}${currentMark(href, current)}>${long}</a></li>`
+  }).join("\n")
+  return `  <nav class="toolbar" aria-label="Tools">
+    <details class="tb-menu">
+      <summary class="tb-trigger" aria-label="All ${NAV.length} tools">
+        <span class="tb-glyph" aria-hidden="true">&#9636;</span>
+        <span class="tb-label">All ${NAV.length}<span class="tb-label-long"> tools</span></span>
+      </summary>
+      <div class="tb-sheet is-flat">
+        <ul>
+${sheet}
+        </ul>
+        <p class="tb-hub"><a href="${SHADES_PARENT}"${OWNED.has(current) ? ' aria-current="true"' : ""}>All ${FAMILIES.length} shades pages &rarr;</a></p>
+      </div>
+    </details>
+    <div class="tb-scrim"></div>
+    <ul class="tb-rail">
+${rail}
+    </ul>
+  </nav>`
+}
+
+/* The tier-2 switcher, rendered into the shades generator's own workspace and
+   into every shades-of-* page. Real links with real hrefs: these pages differ
+   by more than a preset, so nothing intercepts the click. */
+function shadesChips(current) {
+  const items = SHADES_VARIANTS.map(([href, label]) =>
+    `        <li><a class="chip-link" href="${href}"${href === current ? ' aria-current="page"' : ""}>${label}</a></li>`
+  ).join("\n")
+  return `      <nav class="chip-row" aria-label="Color family">
+        <span class="chip-row-label" id="family-chips-label">Family</span>
+        <ul aria-labelledby="family-chips-label">
+${items}
+        </ul>
+      </nav>`
 }
 
 function head({ title, description, canonical, jsonLd }) {
@@ -120,25 +186,32 @@ function head({ title, description, canonical, jsonLd }) {
 </head>`
 }
 
+/* Brand and one icon button, nothing else — no links, and not sticky, because
+   sticky chrome can overlay an AdSense anchor unit. The five-swatch accent rail
+   moved to the footer: it was what kept the closed mobile header at 121px while
+   showing zero navigation, and at 320px it wrapped the header to a third row. */
 function header(current) {
   return `<body>
+  <a class="skip-link" href="#main">Skip to the tools</a>
   <header class="site-header">
     <div class="wrap">
       <a href="/" class="wordmark" data-panel-link="">hueshift</a>
-      <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="tool-nav" aria-label="Toggle menu">☰</button>
-      <ul class="tool-nav" id="tool-nav">
-${navList(current)}
-      </ul>
       <div class="header-controls">
-        <div class="swatch-rail" data-rail aria-label="Site accent color"><span class="visually-hidden">Site accent color</span></div>
         <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light and dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
       </div>
     </div>
-  </header>`
+  </header>
+<!-- nav:start -->
+${toolbar(current)}
+<!-- nav:end -->`
 }
+
+const FOOTER_RAIL =
+  '      <div class="swatch-rail" data-rail aria-label="Site accent color"><span class="rail-label">Site accent</span></div>'
 
 const FOOTER = `  <footer class="site-footer">
     <div class="wrap">
+${FOOTER_RAIL}
       <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
         <li><a href="/articles/">Articles</a></li>
@@ -257,7 +330,7 @@ function shadesGeneratorPage() {
   })
 
   const body = `${header("/color-shades-generator/")}
-  <main>
+  <main id="main">
     <section class="panel">
       <div class="wrap">
         <div class="panel-head">
@@ -266,6 +339,7 @@ function shadesGeneratorPage() {
         </div>
         <p>Ten tints, ten shades and ten tones from a single base color, plus the 50-950 scale people actually paste into a config. Tints mix toward white, shades toward black, and tones toward grey at the same lightness — three different operations that get used as though they were one.</p>
         <div class="workspace">
+${shadesChips(SHADES_PARENT)}
 
     <div class="controls-grid">
       <div class="field">
@@ -371,7 +445,7 @@ function nameFinderPage() {
   })
 
   const body = `${header("/color-name-finder/")}
-  <main>
+  <main id="main">
     <section class="panel">
       <div class="wrap">
         <div class="panel-head">
@@ -456,8 +530,8 @@ function familyPage(family) {
     name: `Shades of ${family.name} — hueshift.net`, url: canonical, description: copy.description,
   })
 
-  const body = `${header(null)}
-  <main>
+  const body = `${header(canonical.replace(SITE, ""))}
+  <main id="main">
     <section class="panel">
       <div class="wrap">
         <div class="panel-head">
@@ -465,6 +539,7 @@ function familyPage(family) {
           <a class="back-to-tools" href="/color-shades-generator/">← Shades generator</a>
         </div>
         <p class="page-tagline">${esc(copy.tagline)}</p>
+${shadesChips(canonical.replace(SITE, ""))}
         <p>${esc(copy.intro)}</p>
         <p>${esc(copy.second)}</p>
       </div>
@@ -578,22 +653,59 @@ const GENERATED = new Set([
   "color-name-finder/index.html", "color-name-finder.html",
 ])
 
-/** Rewrite the nav in a hand-written page, leaving everything else alone. */
-function syncNav(file) {
+/** Rewrite the whole chrome — header plus toolbar — in a hand-written page.
+ *
+ * The span runs from `<header class="site-header">` to `<!-- nav:end -->`, or
+ * on the first run, before those markers exist, to the end of `</header>`. That
+ * makes the migration off the old in-header `<ul class="tool-nav">` and every
+ * later sweep the same operation, so there is no one-shot mode to get wrong.
+ *
+ * The page's own URL is recovered from its path rather than from the markup it
+ * is about to lose: `/x/index.html` and `/x.html` are the same destination, so
+ * both members of every twin pair are stamped from one list.
+ */
+function pageUrl(file) {
+  let rel = "/" + relative(ROOT, file).split(sep).join("/")
+  if (rel.endsWith("/index.html")) rel = rel.slice(0, -"index.html".length)
+  else if (rel.endsWith(".html")) rel = rel.slice(0, -".html".length) + "/"
+  return rel === "//" ? "/" : rel
+}
+
+function syncChrome(file) {
   const rel = relative(ROOT, file)
   if (GENERATED.has(rel)) return
   const src = readFileSync(file, "utf8")
-  const open = src.indexOf('<ul class="tool-nav" id="tool-nav">')
-  if (open === -1) return
-  const close = src.indexOf("</ul>", open)
-  const currentBlock = src.slice(open, close)
-  const match = currentBlock.match(/data-panel-link="([^"]*)"[^>]*aria-current="page"/)
-  const current = match ? match[1] : null
-  const rebuilt =
-    '<ul class="tool-nav" id="tool-nav">\n' + navList(current) + "\n      "
-  const updated = src.slice(0, open) + rebuilt + src.slice(close)
+  const tag = src.indexOf('<header class="site-header">')
+  if (tag === -1) return
+  // From the start of the line, so the block's own indent is the only one.
+  const open = src.lastIndexOf("\n", tag) + 1
+  const END = "<!-- nav:end -->"
+  const marked = src.indexOf(END, open)
+  const close = marked !== -1
+    ? marked + END.length
+    : src.indexOf("</header>", open) + "</header>".length
+  // header() opens the <body> tag and the skip link; here only the chrome
+  // below it is being replaced, so both are trimmed back off.
+  const block = header(pageUrl(file))
+    .replace(/^<body>\n(  <a class="skip-link"[^\n]*\n)?/, "")
+  let updated = src.slice(0, open) + block + src.slice(close)
+  if (!/<a class="skip-link"/.test(updated)) {
+    updated = updated.replace("<body>\n", '<body>\n  <a class="skip-link" href="#main">Skip to the tools</a>\n')
+  }
+  // ...which needs a #main to skip to. The hand-written pages never had one.
+  if (!/<main[^>]*\bid="main"/.test(updated)) {
+    updated = updated.replace(/<main(\s|>)/, '<main id="main"$1')
+  }
+  // The accent rail came out of the header row — it was what kept the closed
+  // mobile header at 121px while showing zero navigation. It belongs on every
+  // page, so hand-written footers get it too. Idempotent: only if absent.
+  const foot = updated.indexOf('<footer class="site-footer">')
+  if (foot !== -1 && !/swatch-rail[^>]*data-rail/.test(updated.slice(foot))) {
+    updated = updated.slice(0, foot) +
+      updated.slice(foot).replace('      <p class="footer-tag">', FOOTER_RAIL + '\n      <p class="footer-tag">')
+  }
   if (check) {
-    if (updated !== src) stale.push(rel + " (nav)")
+    if (updated !== src) stale.push(rel + " (chrome)")
     return
   }
   if (updated !== src) writeFileSync(file, updated)
@@ -727,7 +839,7 @@ writeBoth("color-name-finder", nameFinderPage())
 for (const family of FAMILIES) writeBoth(`shades-of-${family.key}`, familyPage(family))
 write("sitemap.xml", sitemap())
 syncHomepage()
-for (const file of allHtmlFiles()) syncNav(file)
+for (const file of allHtmlFiles()) syncChrome(file)
 
 if (check) {
   if (stale.length) {
