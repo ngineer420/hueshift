@@ -39,7 +39,7 @@ const CM = require(join(ROOT, "assets/color-math.js"))
 const CN = require(join(ROOT, "assets/color-names.js"))
 const { COPY } = require(join(HERE, "shades_copy.cjs"))
 
-const SITE = "https://hueshift.net"
+const SITE = "https://gamutlens.com"
 const TODAY = "2026-08-11"
 const check = process.argv.includes("--check")
 
@@ -172,7 +172,7 @@ function head({ title, description, canonical, jsonLd }) {
   <link rel="canonical" href="${canonical}">
   <meta name="theme-color" content="#121017">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="hueshift.net">
+  <meta property="og:site_name" content="gamutlens.com">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   <meta property="og:url" content="${canonical}">
@@ -195,7 +195,7 @@ function header(current) {
   <a class="skip-link" href="#main">Skip to the tools</a>
   <header class="site-header">
     <div class="wrap">
-      <a href="/" class="wordmark" data-panel-link="">hueshift</a>
+      <a href="/" class="wordmark" data-panel-link="">gamutlens</a>
       <div class="header-controls">
         <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light and dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
       </div>
@@ -212,7 +212,7 @@ const FOOTER_RAIL =
 const FOOTER = `  <footer class="site-footer">
     <div class="wrap">
 ${FOOTER_RAIL}
-      <p class="footer-tag">hueshift.net — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
+      <p class="footer-tag">gamutlens.com — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
         <li><a href="/articles/">Articles</a></li>
         <li><a href="/privacy/">Privacy</a></li>
@@ -323,10 +323,10 @@ function shadesGeneratorPage() {
   ]
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org", "@type": "WebApplication",
-    name: "Color Shades Generator — hueshift.net", url: canonical,
+    name: "Color Shades Generator — gamutlens.com", url: canonical,
     applicationCategory: "DesignApplication", operatingSystem: "Any (runs in browser)",
     description, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    publisher: { "@type": "Organization", name: "hueshift.net" },
+    publisher: { "@type": "Organization", name: "gamutlens.com" },
   })
 
   const body = `${header("/color-shades-generator/")}
@@ -420,7 +420,7 @@ ${FOOTER}
   <script type="application/ld+json">${faqJsonLd(faq)}</script>
 ${SCRIPTS_PLAIN}`
 
-  return head({ title: "Color Shades Generator — Tints, Shades, Tones | hueshift.net", description, canonical, jsonLd }) + "\n" + body
+  return head({ title: "Color Shades Generator — Tints, Shades, Tones | gamutlens.com", description, canonical, jsonLd }) + "\n" + body
 }
 
 function nameFinderPage() {
@@ -438,10 +438,10 @@ function nameFinderPage() {
   ]
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org", "@type": "WebApplication",
-    name: "Color Name Finder — hueshift.net", url: canonical,
+    name: "Color Name Finder — gamutlens.com", url: canonical,
     applicationCategory: "DesignApplication", operatingSystem: "Any (runs in browser)",
     description, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    publisher: { "@type": "Organization", name: "hueshift.net" },
+    publisher: { "@type": "Organization", name: "gamutlens.com" },
   })
 
   const body = `${header("/color-name-finder/")}
@@ -510,7 +510,7 @@ ${FOOTER}
   <script type="application/ld+json">${faqJsonLd(faq)}</script>
 ${SCRIPTS_NAMED}`
 
-  return head({ title: "Color Name Finder — What Color Is This Hex? | hueshift.net", description, canonical, jsonLd }) + "\n" + body
+  return head({ title: "Color Name Finder — What Color Is This Hex? | gamutlens.com", description, canonical, jsonLd }) + "\n" + body
 }
 
 /* ---------------------------------------------------- the family landing pages */
@@ -527,7 +527,7 @@ function familyPage(family) {
   const ramp = CM.rampScale(base)
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org", "@type": "WebPage",
-    name: `Shades of ${family.name} — hueshift.net`, url: canonical, description: copy.description,
+    name: `Shades of ${family.name} — gamutlens.com`, url: canonical, description: copy.description,
   })
 
   const body = `${header(canonical.replace(SITE, ""))}
@@ -611,7 +611,7 @@ ${FOOTER}
   <script type="application/ld+json">${faqJsonLd(copy.faq)}</script>
 ${SCRIPTS_PLAIN}`
 
-  return head({ title: `${copy.title} | hueshift.net`, description: copy.description, canonical, jsonLd }) + "\n" + body
+  return head({ title: `${copy.title} | gamutlens.com`, description: copy.description, canonical, jsonLd }) + "\n" + body
 }
 
 /* -------------------------------------------------------------------- output */
