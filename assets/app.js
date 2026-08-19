@@ -1,5 +1,5 @@
 /*!
- * hueshift.net — shared app behaviour.
+ * gamutlens.com — shared app behaviour.
  * Loaded on every page after assets/color-math.js. Every init function is
  * defensive (bails if its elements aren't on the page), so the same file
  * runs unmodified on the homepage (all six tool panels at once) and on
@@ -292,7 +292,7 @@
         var path = slug ? "/" + slug : "/";
         var title = slug
           ? target.getAttribute("data-title") || document.title
-          : "hueshift.net — browser-only color tools for designers & developers";
+          : "gamutlens.com — browser-only color tools for designers & developers";
         document.title = title;
         history.pushState({ panel: slug || null }, "", path);
       }
