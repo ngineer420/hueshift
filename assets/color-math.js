@@ -354,6 +354,184 @@
     });
   }
 
+
+  // ---- CIE Lab and colour difference ---------------------------------------
+
+  /* Lab is needed here for the same reason color-names.js needs it: equal
+   * numeric distance in Lab is roughly equal perceived difference, and RGB
+   * distance is not. The two files carry the same D65 2-degree transform on
+   * purpose — color-names.js is loaded on two pages and this one on every
+   * page, and coupling them would make every page pay for the 148-entry name
+   * table. tools/build_color_pages.mjs asserts they still agree.
+   */
+  var LAB_WHITE = { x: 95.047, y: 100.0, z: 108.883 }; // D65, 2-degree observer
+
+  function labPivot(t) {
+    return t > 0.008856 ? Math.cbrt(t) : (903.3 * t + 16) / 116;
+  }
+
+  /** {r,g,b} 0-255 -> CIE Lab {L,a,b}. */
+  function rgbToLab(rgb) {
+    var R = srgbChannelToLinear(rgb.r);
+    var G = srgbChannelToLinear(rgb.g);
+    var B = srgbChannelToLinear(rgb.b);
+    var x = (R * 0.4124 + G * 0.3576 + B * 0.1805) * 100 / LAB_WHITE.x;
+    var y = (R * 0.2126 + G * 0.7152 + B * 0.0722) * 100 / LAB_WHITE.y;
+    var z = (R * 0.0193 + G * 0.1192 + B * 0.9505) * 100 / LAB_WHITE.z;
+    var fx = labPivot(x), fy = labPivot(y), fz = labPivot(z);
+    return { L: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
+  }
+
+  /**
+   * CIE76 colour difference: plain Euclidean distance in Lab.
+   *
+   * CIEDE2000 is more accurate, particularly for saturated blues, and is also
+   * forty lines of corrections whose behaviour is hard to check by eye. This
+   * site already made that trade in color-names.js and states it there; making
+   * the same one here means one number means one thing across the site.
+   */
+  function deltaE76(rgbA, rgbB) {
+    var a = rgbToLab(rgbA), b = rgbToLab(rgbB);
+    var dL = a.L - b.L, da = a.a - b.a, db = a.b - b.b;
+    return Math.sqrt(dL * dL + da * da + db * db);
+  }
+
+  // ---- Colour vision deficiency simulation ---------------------------------
+
+  /*
+   * Viénot, Brettel & Mollon (1999), "Digital video colourmaps for checking
+   * the legibility of displays by dichromats", Color Research & Application
+   * 24(4), 243-252.
+   *
+   * One 3x3 per deficiency, applied to LINEAR RGB. The paper is explicit that
+   * the display gamma comes off first and goes back on afterwards, and
+   * skipping that is the most common way this simulation is got wrong: the
+   * matrix is a statement about light, not about the numbers in a PNG.
+   *
+   * Protanopia and deuteranopia ONLY. The single-plane reduction Viénot 1999
+   * derives is valid for the L and M cone axes; it is not valid for the S
+   * axis, which is why the paper does not publish a tritanopia matrix and why
+   * Brettel 1997's two half-planes and axis test exist. A tritan matrix is not
+   * in this table because it is not in that paper.
+   */
+  var VIENOT_1999 = {
+    protanopia: [
+      [0.11238, 0.88762, 0.00000],
+      [0.11238, 0.88762, 0.00000],
+      [0.00401, -0.00401, 1.00000],
+    ],
+    deuteranopia: [
+      [0.29275, 0.70725, 0.00000],
+      [0.29275, 0.70725, 0.00000],
+      [-0.02234, 0.02234, 1.00000],
+    ],
+  };
+
+  /* Achromatopsia is the CIE luminance row three times over — which is the
+     same weighting relativeLuminance() uses, and running it through the same
+     linear-in, gamma-out path as the other two is precisely what stops it
+     producing greys that are far too dark. Writing a linear-light Y straight
+     back into an sRGB triple turns mid-grey #808080 into #373737. */
+  var LUMINANCE_ROW = [0.2126, 0.7152, 0.0722];
+
+  var CVD_MATRICES = {
+    protanopia: VIENOT_1999.protanopia,
+    deuteranopia: VIENOT_1999.deuteranopia,
+    achromatopsia: [LUMINANCE_ROW, LUMINANCE_ROW, LUMINANCE_ROW],
+  };
+
+  /** Linear-light channel (0-1) -> sRGB byte, through the sRGB transfer curve. */
+  function linearToSrgbByte(v) {
+    var c = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055;
+    return clamp(Math.round(c * 255), 0, 255);
+  }
+
+  /**
+   * Simulate a colour vision deficiency.
+   *
+   * @param {{r,g,b}} rgb        an sRGB colour, 0-255
+   * @param {string}  type       "protanopia" | "deuteranopia" | "achromatopsia"
+   * @param {number}  [severity] 0 (unaffected) to 1 (full dichromacy)
+   *
+   * Severity blends the matrix toward the identity IN LINEAR LIGHT rather than
+   * blending the two results afterwards, so half severity lands halfway in the
+   * eye instead of halfway along a gamma curve. It is an approximation of
+   * anomalous trichromacy, not a published model of it — Machado, Oliveira &
+   * Fernandes (2009) fit severity properly from shifted cone fundamentals, and
+   * this is not that. It is worth having anyway, because deuteranomaly is far
+   * more common than deuteranopia and a dichromat-only tool misses the usual
+   * case entirely.
+   */
+  function simulateDeficiency(rgb, type, severity) {
+    var m = CVD_MATRICES[type];
+    if (!m) return { r: rgb.r, g: rgb.g, b: rgb.b };
+    var s = severity == null ? 1 : clamp(severity, 0, 1);
+    if (s === 0) return { r: rgb.r, g: rgb.g, b: rgb.b };
+
+    var lin = [
+      srgbChannelToLinear(rgb.r),
+      srgbChannelToLinear(rgb.g),
+      srgbChannelToLinear(rgb.b),
+    ];
+    var out = [0, 0, 0];
+    for (var i = 0; i < 3; i++) {
+      var acc = 0;
+      for (var k = 0; k < 3; k++) {
+        var coeff = m[i][k] * s + (i === k ? 1 - s : 0);
+        acc += coeff * lin[k];
+      }
+      out[i] = acc;
+    }
+    return {
+      r: linearToSrgbByte(out[0]),
+      g: linearToSrgbByte(out[1]),
+      b: linearToSrgbByte(out[2]),
+    };
+  }
+
+  /**
+   * CIE76 ΔE*ab at which two colours stop being two colours.
+   *
+   * Under about 2.3 is the classic just-noticeable difference (Mahy, Van
+   * Eycken & Oosterlinck, 1994) — a threshold that strict would only ever flag
+   * pairs that were already almost identical. 10 is the distance at which a
+   * pair reads as "the same colour, slightly different" rather than as two
+   * colours, which is the question a palette is actually asking. The report
+   * uses it in both directions: a pair is flagged when it was at least 10
+   * apart to begin with and lands under 10 once simulated.
+   */
+  var CVD_DELTA_E = 10;
+
+  /**
+   * Which pairs in a palette collapse.
+   *
+   * @param {string[]} hexes
+   * @returns {{i,j,before,after,hexA,hexB}[]} pairs, worst collapse first
+   */
+  function collapsedPairs(hexes, type, severity, threshold) {
+    var limit = threshold == null ? CVD_DELTA_E : threshold;
+    var rgbs = hexes.map(hexToRgb);
+    var sim = rgbs.map(function (c) { return c && simulateDeficiency(c, type, severity); });
+    var out = [];
+    for (var i = 0; i < rgbs.length; i++) {
+      for (var jj = i + 1; jj < rgbs.length; jj++) {
+        if (!rgbs[i] || !rgbs[jj]) continue;
+        var before = deltaE76(rgbs[i], rgbs[jj]);
+        var after = deltaE76(sim[i], sim[jj]);
+        if (before >= limit && after < limit) {
+          out.push({
+            i: i, j: jj,
+            before: round(before, 1),
+            after: round(after, 1),
+            hexA: rgbToHex(rgbs[i].r, rgbs[i].g, rgbs[i].b),
+            hexB: rgbToHex(rgbs[jj].r, rgbs[jj].g, rgbs[jj].b),
+          });
+        }
+      }
+    }
+    return out.sort(function (a, b) { return a.after - b.after; });
+  }
+
   return {
     clamp: clamp,
     round: round,
@@ -376,5 +554,11 @@
     contrastVerdict: contrastVerdict,
     rotateHue: rotateHue,
     paletteScheme: paletteScheme,
+    rgbToLab: rgbToLab,
+    deltaE76: deltaE76,
+    simulateDeficiency: simulateDeficiency,
+    collapsedPairs: collapsedPairs,
+    CVD_MATRICES: CVD_MATRICES,
+    CVD_DELTA_E: CVD_DELTA_E,
   };
 });

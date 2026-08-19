@@ -34,9 +34,9 @@
 <!-- nav:start -->
   <nav class="toolbar" aria-label="Tools">
     <details class="tb-menu">
-      <summary class="tb-trigger" aria-label="All 8 tools">
+      <summary class="tb-trigger" aria-label="All 9 tools">
         <span class="tb-glyph" aria-hidden="true">&#9636;</span>
-        <span class="tb-label">All 8<span class="tb-label-long"> tools</span></span>
+        <span class="tb-label">All 9<span class="tb-label-long"> tools</span></span>
       </summary>
       <div class="tb-sheet is-flat">
         <ul>
@@ -48,6 +48,7 @@
         <li><a href="/color-shades-generator/">Color Shades Generator</a></li>
         <li><a href="/color-name-finder/">Color Name Finder</a></li>
         <li><a href="/image-color-extractor/" data-panel-link="image-color-extractor">Image Color Extractor</a></li>
+        <li><a href="/color-blindness-simulator/">Color Blindness Simulator</a></li>
         </ul>
         <p class="tb-hub"><a href="/color-shades-generator/">All 10 shades pages &rarr;</a></p>
       </div>
@@ -134,7 +135,7 @@
         <dt>Is 21:1 the maximum possible?</dt>
         <dd>Yes — that's pure black text on pure white (or vice versa), the widest possible contrast in sRGB.</dd>
         <dt>Does this account for color blindness?</dt>
-        <dd>No — WCAG contrast ratio measures luminance difference, not hue distinguishability. For color-blind-safe palettes, also avoid relying on hue alone to convey information.</dd>
+        <dd>No — WCAG contrast ratio measures luminance difference, not hue distinguishability. Two colours can pass 7:1 here and still land on each other for a deuteranope. The <a href="/color-blindness-simulator/">colour blindness simulator</a> answers that half: paste a palette in and it reports which pairs collapse into one colour. The rule that survives both questions is not to let hue carry meaning on its own.</dd>
         </dl>
       </div>
     </section>
@@ -162,7 +163,7 @@
     </div>
   </footer>
 <a href="https://erabb.it" class="erabbit-mark" aria-label="erabb.it"><img src="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐇</text></svg>" width="10" height="10" alt=""></a>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What ratio do I need?","acceptedAnswer":{"@type":"Answer","text":"WCAG 2.1 requires 4.5:1 for normal text and 3:1 for large text (18pt+, or 14pt+ bold) to meet AA. AAA raises that to 7:1 and 4.5:1 respectively."}},{"@type":"Question","name":"How is the ratio calculated?","acceptedAnswer":{"@type":"Answer","text":"Using the WCAG relative luminance formula on both colors' sRGB values, then (L1 + 0.05) / (L2 + 0.05) with the lighter color as L1 \u2014 the same math browsers' accessibility inspectors use."}},{"@type":"Question","name":"Is 21:1 the maximum possible?","acceptedAnswer":{"@type":"Answer","text":"Yes \u2014 that's pure black text on pure white (or vice versa), the widest possible contrast in sRGB."}},{"@type":"Question","name":"Does this account for color blindness?","acceptedAnswer":{"@type":"Answer","text":"No \u2014 WCAG contrast ratio measures luminance difference, not hue distinguishability. For color-blind-safe palettes, also avoid relying on hue alone to convey information."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What ratio do I need?","acceptedAnswer":{"@type":"Answer","text":"WCAG 2.1 requires 4.5:1 for normal text and 3:1 for large text (18pt+, or 14pt+ bold) to meet AA. AAA raises that to 7:1 and 4.5:1 respectively."}},{"@type":"Question","name":"How is the ratio calculated?","acceptedAnswer":{"@type":"Answer","text":"Using the WCAG relative luminance formula on both colors' sRGB values, then (L1 + 0.05) / (L2 + 0.05) with the lighter color as L1 \u2014 the same math browsers' accessibility inspectors use."}},{"@type":"Question","name":"Is 21:1 the maximum possible?","acceptedAnswer":{"@type":"Answer","text":"Yes \u2014 that's pure black text on pure white (or vice versa), the widest possible contrast in sRGB."}},{"@type":"Question","name":"Does this account for color blindness?","acceptedAnswer":{"@type":"Answer","text":"No \u2014 WCAG contrast ratio measures luminance difference, not hue distinguishability. Two colours can pass 7:1 here and still land on each other for a deuteranope; the colour blindness simulator on this site reports which pairs in a palette collapse into one colour. The rule that survives both questions is not to let hue carry meaning on its own."}}]}</script>
   <script src="/assets/color-math.js"></script>
   <script src="/assets/app.js"></script>
 </body>

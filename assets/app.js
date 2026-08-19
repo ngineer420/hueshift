@@ -587,6 +587,18 @@
         scheme: scheme,
       });
 
+      /* The palette carried across to the simulator, in the same
+         comma-separated shape setShareUrl already emits for the gradient's
+         stops. A palette is exactly the input the collision report wants, and
+         retyping five hex values is the reason nobody ever checks. */
+      var cvdLink = document.getElementById("pg-cvd-link");
+      if (cvdLink) {
+        cvdLink.href = "/color-blindness-simulator/?stops=" + swatches.map(function (s) {
+          var srgb = CM.hslToRgb(s.h, s.s, s.l);
+          return bare(CM.rgbToHex(srgb.r, srgb.g, srgb.b));
+        }).join(",");
+      }
+
       results.innerHTML = "";
       swatches.forEach(function (s, i) {
         var srgb = CM.hslToRgb(s.h, s.s, s.l);
@@ -863,6 +875,272 @@
     });
   }
 
+
+  /* ==================== COLOR BLINDNESS SIMULATOR (cb-) ====================
+   * Palette mode is the headline. Coblis and Chrome DevTools' built-in vision
+   * deficiency emulation both re-render an image; neither tells you WHICH TWO
+   * of your swatches have just become one colour, which is the question a
+   * palette is actually asking. Image mode is the commodity half and sits
+   * below it.
+   *
+   * The maths — the Viénot 1999 matrices, the linear-light path, Lab and the
+   * ΔE cutoff — is all in color-math.js. This is wiring.
+   */
+  var CB_TYPES = ["deuteranopia", "protanopia", "achromatopsia"];
+
+  var CB_LABELS = {
+    deuteranopia: { full: "Deuteranopia", partial: "Deuteranomaly", who: "the M cone is missing (deuteranopia) or shifted (deuteranomaly) — about 6% of men" },
+    protanopia: { full: "Protanopia", partial: "Protanomaly", who: "the L cone is missing (protanopia) or shifted (protanomaly) — about 2% of men" },
+    achromatopsia: { full: "Achromatopsia", partial: "Partial achromatopsia", who: "no usable colour discrimination at all — vanishingly rare, but the strictest test a palette can face" },
+  };
+
+  var CB_DEFAULT = ["#d64545", "#45a045", "#3b7dd8", "#e0a020", "#7b4fa8"];
+
+  function initColorBlindness() {
+    var list = document.getElementById("cb-swatches");
+    if (!list) return;
+
+    var addBtn = document.getElementById("cb-add");
+    var typeSelect = document.getElementById("cb-type");
+    var severity = document.getElementById("cb-severity");
+    var severityOut = document.getElementById("cb-severity-out");
+    var before = document.getElementById("cb-row-before");
+    var after = document.getElementById("cb-row-after");
+    var afterLabel = document.getElementById("cb-after-label");
+    var report = document.getElementById("cb-report");
+    var matrixOut = document.getElementById("cb-matrix");
+
+    var dropzone = document.getElementById("cb-dropzone");
+    var fileInput = document.getElementById("cb-file-input");
+    var imgEl = document.getElementById("cb-img");
+    var imageWrap = document.getElementById("cb-image-wrap");
+    var canvasBefore = document.getElementById("cb-canvas-before");
+    var canvasAfter = document.getElementById("cb-canvas-after");
+
+    function hexes() {
+      return Array.prototype.slice.call(list.querySelectorAll('input[type="color"]'))
+        .map(function (i) { return i.value; });
+    }
+
+    function addSwatch(hex) {
+      var row = document.createElement("div");
+      row.className = "cb-swatch-row";
+      row.innerHTML =
+        '<input type="color" value="' + hex + '" aria-label="Palette color">' +
+        '<input type="text" class="cb-hex" value="' + hex + '" spellcheck="false" autocomplete="off" aria-label="Palette color as hex">' +
+        '<button type="button" class="ghost-btn" aria-label="Remove color">✕</button>';
+      list.appendChild(row);
+      return row;
+    }
+
+    function labelFor(type, s) {
+      var l = CB_LABELS[type];
+      return s >= 0.999 ? l.full : s <= 0.001 ? "No deficiency" : l.partial + " (" + Math.round(s * 100) + "%)";
+    }
+
+    /* The matrix is printed from the same table the simulation runs on, so the
+       coefficients on the page cannot drift from the ones doing the work. */
+    function renderMatrix(type, s) {
+      if (!matrixOut) return;
+      var m = CM.CVD_MATRICES[type];
+      var rows = m.map(function (row, i) {
+        return row.map(function (v, k) {
+          var coeff = v * s + (i === k ? 1 - s : 0);
+          return (coeff >= 0 ? " " : "") + coeff.toFixed(5);
+        }).join("  ");
+      });
+      matrixOut.textContent = rows.join("\n");
+    }
+
+    function renderReport(list_, type, s) {
+      report.innerHTML = "";
+      var pairs = CM.collapsedPairs(list_, type, s);
+      var head = document.createElement("p");
+      head.className = "cb-report-head";
+
+      if (s <= 0.001) {
+        head.textContent = "Severity is at zero, so nothing is being simulated.";
+        report.appendChild(head);
+        return;
+      }
+      if (list_.length < 2) {
+        head.textContent = "Add a second colour and this reports which pairs collapse into one.";
+        report.appendChild(head);
+        return;
+      }
+      if (!pairs.length) {
+        head.className += " is-ok";
+        head.textContent = "No pair in this palette collapses. Every pair that was at least "
+          + CM.CVD_DELTA_E + " ΔE*ab apart is still at least that far apart to "
+          + labelFor(type, s).toLowerCase() + ".";
+        report.appendChild(head);
+        return;
+      }
+      head.className += " is-warn";
+      head.textContent = pairs.length + (pairs.length === 1 ? " pair reads" : " pairs read")
+        + " as the same colour to " + labelFor(type, s).toLowerCase() + ".";
+      report.appendChild(head);
+
+      var ul = document.createElement("ul");
+      ul.className = "cb-report-list";
+      pairs.forEach(function (p) {
+        var li = document.createElement("li");
+        li.innerHTML =
+          '<span class="cb-pair">' +
+          '<span class="cb-dot" style="background:' + p.hexA + '"></span>' +
+          '<span class="mono">' + p.hexA + '</span>' +
+          '<span class="cb-pair-arrow" aria-hidden="true">+</span>' +
+          '<span class="cb-dot" style="background:' + p.hexB + '"></span>' +
+          '<span class="mono">' + p.hexB + '</span>' +
+          "</span>" +
+          '<span class="cb-delta">ΔE*ab ' + p.before.toFixed(1) + " → <b>" + p.after.toFixed(1) + "</b></span>";
+        ul.appendChild(li);
+      });
+      report.appendChild(ul);
+    }
+
+    function renderStrip(target, colors, simulate, type, s) {
+      target.innerHTML = "";
+      colors.forEach(function (hex) {
+        var rgb = CM.hexToRgb(hex);
+        if (!rgb) return;
+        var shown = simulate ? CM.simulateDeficiency(rgb, type, s) : rgb;
+        var shownHex = CM.rgbToHex(shown.r, shown.g, shown.b);
+        var chip = document.createElement("div");
+        chip.className = "cb-chip";
+        chip.innerHTML =
+          '<span class="cb-chip-swatch" style="background:' + shownHex + '"></span>' +
+          '<span class="mono">' + shownHex + "</span>";
+        target.appendChild(chip);
+      });
+    }
+
+    function renderImage(type, s) {
+      if (!imgEl || !imgEl.naturalWidth) return;
+      var maxDim = 520;
+      var scale = Math.min(1, maxDim / Math.max(imgEl.naturalWidth, imgEl.naturalHeight));
+      var w = Math.max(1, Math.round(imgEl.naturalWidth * scale));
+      var h = Math.max(1, Math.round(imgEl.naturalHeight * scale));
+      [canvasBefore, canvasAfter].forEach(function (c) { c.width = w; c.height = h; });
+
+      var ctxB = canvasBefore.getContext("2d");
+      ctxB.drawImage(imgEl, 0, 0, w, h);
+      var data = ctxB.getImageData(0, 0, w, h);
+      var px = data.data;
+      var probe = { r: 0, g: 0, b: 0 };
+      for (var i = 0; i < px.length; i += 4) {
+        probe.r = px[i]; probe.g = px[i + 1]; probe.b = px[i + 2];
+        var out = CM.simulateDeficiency(probe, type, s);
+        px[i] = out.r; px[i + 1] = out.g; px[i + 2] = out.b;
+      }
+      canvasAfter.getContext("2d").putImageData(data, 0, 0);
+      imageWrap.classList.add("is-visible");
+    }
+
+    function render() {
+      var type = typeSelect.value;
+      var s = Number(severity.value) / 100;
+      var colors = hexes();
+
+      severityOut.textContent = Math.round(s * 100) + "%";
+      afterLabel.textContent = labelFor(type, s);
+
+      // Keep each hex box in step with its own colour well.
+      Array.prototype.slice.call(list.querySelectorAll(".cb-swatch-row")).forEach(function (row) {
+        var well = row.querySelector('input[type="color"]');
+        var hex = row.querySelector(".cb-hex");
+        if (document.activeElement !== hex) hex.value = well.value;
+      });
+
+      renderStrip(before, colors, false, type, s);
+      renderStrip(after, colors, true, type, s);
+      renderReport(colors, type, s);
+      renderMatrix(type, s);
+      renderImage(type, s);
+
+      setShareUrl("cb-share-url", "color-blindness-simulator", {
+        type: type,
+        severity: Math.round(s * 100),
+        stops: colors.map(function (h) { return bare(h); }).join(","),
+      });
+
+      var removeBtns = list.querySelectorAll(".cb-swatch-row button");
+      Array.prototype.forEach.call(removeBtns, function (b) { b.disabled = colors.length <= 2; });
+    }
+
+    /* A palette arrives from /color-palette-generator/ and from the gradient
+       generator in the same comma-and-colon shape setShareUrl already emits,
+       so "check this palette" is one link rather than five copy-pastes. The
+       position after the colon is the gradient's; here it is ignored. */
+    var shared = (qsp.get("stops") || "")
+      .split(",")
+      .map(function (chunk) {
+        var raw = chunk.split(":")[0];
+        if (!raw) return null;
+        var rgb = CM.hexToRgb(raw.charAt(0) === "#" ? raw : "#" + raw);
+        return rgb ? CM.rgbToHex(rgb.r, rgb.g, rgb.b) : null;
+      })
+      .filter(Boolean);
+
+    typeSelect.value = paramOneOf("type", CB_TYPES, "deuteranopia");
+    severity.value = paramInt("severity", 0, 100, 100);
+
+    (shared.length >= 2 ? shared : CB_DEFAULT).slice(0, 12).forEach(addSwatch);
+
+    list.addEventListener("input", function (e) {
+      if (e.target.classList && e.target.classList.contains("cb-hex")) {
+        var rgb = CM.hexToRgb(e.target.value);
+        if (!rgb) return;
+        e.target.closest(".cb-swatch-row").querySelector('input[type="color"]').value =
+          CM.rgbToHex(rgb.r, rgb.g, rgb.b);
+      }
+      render();
+    });
+    list.addEventListener("click", function (e) {
+      var btn = e.target.closest("button");
+      if (!btn) return;
+      if (list.querySelectorAll(".cb-swatch-row").length <= 2) return;
+      btn.closest(".cb-swatch-row").remove();
+      render();
+    });
+    addBtn.addEventListener("click", function () {
+      var n = list.querySelectorAll(".cb-swatch-row").length;
+      if (n >= 12) return;
+      addSwatch(CB_DEFAULT[n % CB_DEFAULT.length]);
+      render();
+    });
+    typeSelect.addEventListener("change", render);
+    severity.addEventListener("input", render);
+
+    if (dropzone) {
+      function handleImage(file) {
+        if (!file || file.type.indexOf("image/") !== 0) return;
+        var url = URL.createObjectURL(file);
+        imgEl.onload = function () {
+          render();
+          URL.revokeObjectURL(url);
+        };
+        imgEl.src = url;
+      }
+      dropzone.addEventListener("click", function () { fileInput.click(); });
+      dropzone.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+      });
+      fileInput.addEventListener("change", function () { handleImage(fileInput.files[0]); });
+      ["dragenter", "dragover"].forEach(function (evt) {
+        dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.add("is-drag"); });
+      });
+      ["dragleave", "drop"].forEach(function (evt) {
+        dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.remove("is-drag"); });
+      });
+      dropzone.addEventListener("drop", function (e) {
+        handleImage(e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+    }
+
+    render();
+  }
+
   /* ==================== SHADES GENERATOR (cs-) ==================== */
   /* Tints, shades and tones from one base colour, plus the 50-950 scale.
      The maths lives in color-math.js; this is only wiring. */
@@ -1041,5 +1319,6 @@
     initExtractor();
     initShades();
     initColorNameFinder();
+    initColorBlindness();
   });
 })();
