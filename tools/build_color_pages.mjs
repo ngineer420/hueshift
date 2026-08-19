@@ -65,7 +65,20 @@ const NAV = [
   ["/color-shades-generator/", "Shades", "Color Shades Generator", null],
   ["/color-name-finder/", "Color Names", "Color Name Finder", null],
   ["/image-color-extractor/", "From Image", "Image Color Extractor", "image-color-extractor"],
+  ["/color-blindness-simulator/", "Color Blindness", "Color Blindness Simulator", null],
 ]
+
+/* The nav decision this site had to make on reaching nine destinations, made
+   here rather than left implicit: the rail stays at eight and the simulator is
+   SHEET-ONLY.
+
+   The rail is measured traffic, not expected traffic, and a page published
+   today has no impressions to have earned a slot with. Demoting one of the
+   eight to make room would be trading a known number for a guess. The sheet
+   carries all nine and stays flat — nine destinations in a two-column list is
+   still a list, and group headings over three-and-three-and-three would be
+   more chrome than the set needs. */
+const RAIL_CAP = 8
 
 const FAMILIES = [
   { key: "blue", name: "Blue", base: "#1e90ff" },
@@ -114,7 +127,7 @@ function currentMark(href, current) {
 }
 
 function toolbar(current) {
-  const rail = NAV.map(([href, label, , slug]) => {
+  const rail = NAV.slice(0, RAIL_CAP).map(([href, label, , slug]) => {
     const panel = slug === null ? "" : ` data-panel-link="${slug}"`
     return `      <li><a href="${href}"${panel}${currentMark(href, current)}>${label}</a></li>`
   }).join("\n")
@@ -614,6 +627,146 @@ ${SCRIPTS_PLAIN}`
   return head({ title: `${copy.title} | gamutlens.com`, description: copy.description, canonical, jsonLd }) + "\n" + body
 }
 
+
+/* --------------------------------------------- colour blindness simulator */
+
+/* The headline is the palette collision report, not the image filter. Coblis
+   and Chrome DevTools' built-in vision-deficiency emulation both re-render a
+   picture; neither answers "which two of my swatches just became one colour",
+   which is the only question a palette is asking. The image half is the
+   commodity half and is deliberately second on the page. */
+function colorBlindnessPage() {
+  const canonical = SITE + "/color-blindness-simulator/"
+  const description =
+    "Simulate deuteranopia, protanopia and achromatopsia with the Viénot 1999 transform, at any severity — and get told which two swatches in your palette collapse into the same colour."
+  const faq = [
+    ["Which simulation model is this?",
+     "Viénot, Brettel & Mollon (1999), 'Digital video colourmaps for checking the legibility of displays by dichromats', Color Research & Application 24(4), 243-252. One 3x3 matrix per deficiency, applied to linear RGB — the sRGB gamma comes off first and goes back on afterwards, because the matrix is a statement about light rather than about the numbers in a PNG. The exact coefficients in use are printed on the page, straight out of the table the simulation runs on."],
+    ["Why is there no tritanopia?",
+     "Because Viénot 1999 does not publish one. The single-plane reduction that paper derives is valid for the L and M cone axes and is not valid for the S axis; simulating tritanopia properly needs Brettel 1997's two half-planes and an axis test to pick between them. A tritan matrix would have to be invented or borrowed from a different model, and a page that mixes models without saying so is worse than one that is missing a rare deficiency. Tritanopia affects well under a tenth of a percent of people; deuteranomaly, which this page does simulate, affects around 6% of men."],
+    ["What does the severity slider actually do?",
+     "It blends the matrix toward the identity in linear light, so 50% lands halfway in the eye rather than halfway along a gamma curve. That is an approximation of anomalous trichromacy, not a published model of it: Machado, Oliveira & Fernandes (2009) fit severity properly from shifted cone fundamentals, and this is not that. It is here because deuteranomaly is far more common than deuteranopia, so a dichromat-only tool misses the usual case entirely."],
+    ["Where does the collision threshold come from?",
+     "CIE76 ΔE*ab, with a cutoff of 10. Under about 2.3 is the classic just-noticeable difference (Mahy, Van Eycken & Oosterlinck, 1994), which is far too strict here — it would only flag pairs that were already almost identical. 10 is roughly where a pair stops reading as two colours and starts reading as one colour twice. The report uses it in both directions: a pair is flagged when it was at least 10 apart to begin with and lands under 10 once simulated. CIE76 is Euclidean distance in Lab; CIEDE2000 is more accurate for saturated blues, and this site made the same trade in its colour-name lookup and says so there too."],
+    ["Does a clean report mean my palette is accessible?",
+     "No. A simulation approximates one person's colour vision from a population model; it does not certify anything, and no browser tool can. It tells you where to look. Colour should never be the only thing carrying meaning in the first place — pair it with a label, a shape, a pattern or a position, and check the pairs that matter for contrast as well, which is a different question with its own thresholds."],
+    ["Is my image uploaded anywhere?",
+     "No. The file is read by your own browser, drawn to a canvas in this tab and processed pixel by pixel here. Nothing is sent anywhere, which is also why the preview is capped at 520px on its long edge: every pixel costs a matrix multiply on your machine."],
+  ]
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org", "@type": "WebApplication",
+    name: "Color Blindness Simulator — gamutlens.com", url: canonical,
+    applicationCategory: "DesignApplication", operatingSystem: "Any (runs in browser)",
+    description, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    publisher: { "@type": "Organization", name: "gamutlens.com" },
+  })
+
+  const body = `${header("/color-blindness-simulator/")}
+  <main id="main">
+    <section class="panel">
+      <div class="wrap">
+        <div class="panel-head">
+          <h1 tabindex="-1">Color Blindness Simulator</h1>
+          <a class="back-to-tools" href="/" data-panel-link="">← All tools</a>
+        </div>
+        <p>Two swatches that read as different colours to you can land on the same colour for the roughly 8% of men with a red-green deficiency. Put your palette in and this says <strong>which pairs</strong> — not just what the palette looks like, but which two of them stopped being two.</p>
+        <div class="workspace">
+
+    <div class="cb-grid">
+      <div>
+        <span class="label">Palette</span>
+        <div id="cb-swatches" class="cb-swatch-list"></div>
+        <button type="button" class="ghost-btn" id="cb-add">+ Add a color</button>
+      </div>
+      <div class="controls-grid cb-controls">
+        <div class="field">
+          <label for="cb-type">Deficiency</label>
+          <select id="cb-type">
+            <option value="deuteranopia">Deuteranopia / deuteranomaly — M cone</option>
+            <option value="protanopia">Protanopia / protanomaly — L cone</option>
+            <option value="achromatopsia">Achromatopsia — no color</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="cb-severity">Severity <output id="cb-severity-out" for="cb-severity">100%</output></label>
+          <input type="range" id="cb-severity" min="0" max="100" value="100">
+          <p class="field-note">100% is full dichromacy. Anything below it is the anomalous form, which is the far more common one.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="strip-title">Your palette <span>as you see it</span></h2>
+    <div class="cb-strip" id="cb-row-before"></div>
+
+    <h2 class="strip-title">Simulated <span id="cb-after-label">Deuteranopia</span></h2>
+    <div class="cb-strip" id="cb-row-after"></div>
+
+    <div class="cb-report" id="cb-report" role="status"></div>
+
+    <details class="cb-matrix-details">
+      <summary>The matrix actually being applied</summary>
+      <p>Vi&eacute;not, Brettel &amp; Mollon (1999). Applied to <strong>linear</strong> RGB, then re-encoded through the sRGB transfer curve. Below 100% severity it is blended toward the identity, which is what the numbers show.</p>
+      <pre class="cb-matrix" id="cb-matrix"></pre>
+    </details>
+
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cb-share-url" readonly aria-label="Shareable link to this simulation">
+      <button type="button" class="copy-btn" data-copy-target="cb-share-url">Copy link</button>
+    </div>
+
+    <h2 class="strip-title">An image <span>the secondary mode</span></h2>
+    <div class="dropzone" id="cb-dropzone" tabindex="0" role="button" aria-label="Choose an image to simulate">
+      <p>Drop an image here, or click to choose one. It never leaves this tab.</p>
+      <input type="file" id="cb-file-input" accept="image/*" hidden>
+    </div>
+    <img id="cb-img" alt="" hidden>
+    <div class="cb-image-pair" id="cb-image-wrap">
+      <figure><figcaption>As you see it</figcaption><canvas id="cb-canvas-before"></canvas></figure>
+      <figure><figcaption>Simulated</figcaption><canvas id="cb-canvas-after"></canvas></figure>
+    </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="wrap">
+        <h2>A simulation approximates. It does not certify.</h2>
+        <p>What you are looking at is a population model of one kind of colour vision, rendered on your display, in your lighting, through your eyes. It is a good way to find the pairs that are likely to be a problem and a bad way to conclude that a design is accessible. Nobody with a colour vision deficiency sees exactly this, and no browser tool can tell you what any individual person sees.</p>
+        <p>Treat a clean report as "nothing obvious here" rather than as a pass. The reliable fix is not to find colours that survive the simulation — it is to stop colour carrying meaning on its own. A legend with shapes as well as colours, a line with a dash pattern, a status with a word next to the dot: those work for every deficiency at once, including the ones no simulator models well.</p>
+        <p>Contrast is a separate question with separate thresholds, and this page does not answer it. Two colours can be clearly distinguishable to everyone and still fail as text on a background. The <a href="/contrast-checker/">contrast checker</a> is the other half.</p>
+
+        <h2>How the collision report works</h2>
+        <p>Every pair of swatches is converted to CIE Lab and measured twice: once as you entered it, once after simulation. A pair is flagged when it started at least <strong>10 &Delta;E*ab</strong> apart — far enough that you can tell them apart — and finishes under 10, which is where a pair stops reading as two colours and starts reading as one colour twice.</p>
+        <p>The threshold is stated because it has to be. Under about 2.3 &Delta;E*ab is the classic just-noticeable difference, and a report using that would fire on almost nothing. Ten is a judgement, but it is a stated one, and both numbers are on screen for every flagged pair so you can disagree with it and still use the answer.</p>
+
+        <h2>What each mode simulates</h2>
+        <p><strong>Deuteranopia and deuteranomaly</strong> come from the M cone being absent or shifted. Around 6% of men are somewhere on this axis, which makes it by far the most important row in the table. <strong>Protanopia and protanomaly</strong> are the L cone, at around 2% of men, and they also darken reds noticeably, which the simulation reproduces. <strong>Achromatopsia</strong> collapses everything onto luminance — vanishingly rare, and the strictest single test you can put a palette through, because anything that survives it is carrying its meaning in lightness rather than in hue.</p>
+        <p>Tritanopia is not here. Vi&eacute;not 1999 does not publish a matrix for it, because the single-plane reduction that model uses is not valid on the S-cone axis; doing it properly means implementing Brettel 1997's two half-planes and the test that picks between them. Rather than borrow a coefficient from a different model and not say so, this page leaves it out and says why.</p>
+      </div>
+    </section>
+
+${faqBlock(faq)}
+
+    <section class="content-section">
+      <div class="wrap">
+        <h2>Next</h2>
+        <div class="related-links">
+        <a href="/color-palette-generator/">Palette Generator →</a>
+        <a href="/contrast-checker/">Contrast Checker →</a>
+        <a href="/color-shades-generator/">Shades Generator →</a>
+        <a href="/image-color-extractor/">Image Color Extractor →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+${FOOTER}
+  <script type="application/ld+json">${faqJsonLd(faq)}</script>
+${SCRIPTS_PLAIN}`
+
+  return head({ title: "Color Blindness Simulator — Deuteranopia, Protanopia | gamutlens.com", description, canonical, jsonLd }) + "\n" + body
+}
+
 /* -------------------------------------------------------------------- output */
 
 const stale = []
@@ -651,6 +804,7 @@ const GENERATED = new Set([
   ...FAMILIES.flatMap(f => [`shades-of-${f.key}/index.html`, `shades-of-${f.key}.html`]),
   "color-shades-generator/index.html", "color-shades-generator.html",
   "color-name-finder/index.html", "color-name-finder.html",
+  "color-blindness-simulator/index.html", "color-blindness-simulator.html",
 ])
 
 /** Rewrite the whole chrome — header plus toolbar — in a hand-written page.
@@ -724,6 +878,9 @@ function homepageCards() {
     ["/color-name-finder/",
      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/>',
      "Color Name Finder", "What is this hex actually called?"],
+    ["/color-blindness-simulator/",
+     '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18"/>',
+     "Color Blindness Simulator", "Which two swatches collapse into one?"],
   ]
   return cards.map(([href, icon, name, tagline]) =>
     `          <a class="tool-card" href="${href}">
@@ -764,7 +921,7 @@ function sitemap() {
   const urls = [
     "/", "/color-picker/", "/color-converter/", "/gradient-generator/",
     "/color-palette-generator/", "/contrast-checker/", "/image-color-extractor/",
-    "/color-shades-generator/", "/color-name-finder/",
+    "/color-shades-generator/", "/color-name-finder/", "/color-blindness-simulator/",
     ...FAMILIES.map(f => `/shades-of-${f.key}/`),
     "/privacy/", "/terms/", "/articles/",
     "/articles/hex-rgb-hsl-which-color-format-to-use/",
@@ -824,6 +981,60 @@ function assertMath() {
   ok(near("#c0c0c0") === "silver", "#c0c0c0 should be silver")
   ok(near("#4682b4") === "steelblue", "#4682b4 should be steelblue")
   ok(CN.NAMES.length === 148, "expected 148 CSS names, got " + CN.NAMES.length)
+
+  /* The colour-vision simulation, asserted rather than eyeballed. Every one of
+     these is a mistake that looks fine on screen. */
+  const hx = CM.hexToRgb
+  const hex = rgb => CM.rgbToHex(rgb.r, rgb.g, rgb.b)
+  const sim = (h, t, s) => hex(CM.simulateDeficiency(hx(h), t, s))
+
+  // The gamma bug. relativeLuminance() returns LINEAR light, and writing it
+  // straight back into an sRGB triple turns mid-grey into #373737.
+  ok(sim("#808080", "achromatopsia") === "#808080",
+     "achromatopsia must re-encode through the gamma curve; #808080 came back " + sim("#808080", "achromatopsia"))
+  ok(sim("#ffffff", "achromatopsia") === "#ffffff", "white must stay white under achromatopsia")
+  ok(sim("#000000", "achromatopsia") === "#000000", "black must stay black under achromatopsia")
+
+  // Severity 0 is a no-op for every model; severity 1 is not.
+  for (const type of ["protanopia", "deuteranopia", "achromatopsia"]) {
+    ok(sim("#e01b24", type, 0) === "#e01b24", type + " at severity 0 must not change the colour")
+    ok(sim("#e01b24", type, 1) !== "#e01b24", type + " at severity 1 must change a red")
+  }
+
+  // A grey has nothing for a red-green deficiency to take away.
+  ok(CM.deltaE76(hx("#808080"), CM.simulateDeficiency(hx("#808080"), "deuteranopia")) < 1,
+     "a neutral grey should be near-unchanged by deuteranopia")
+
+  // The whole point of the page: a red and a green of similar lightness
+  // collapse for a deuteranope and are flagged.
+  const collide = CM.collapsedPairs(["#d64545", "#45a045"], "deuteranopia", 1)
+  ok(collide.length === 1, "#d64545 and #45a045 should be flagged as collapsing for a deuteranope")
+  ok(collide.length && collide[0].after < CM.CVD_DELTA_E, "the flagged pair must land under the threshold")
+  ok(CM.collapsedPairs(["#d64545", "#45a045"], "deuteranopia", 0).length === 0,
+     "nothing should be flagged at severity 0")
+  ok(CM.collapsedPairs(["#111111", "#eeeeee"], "deuteranopia", 1).length === 0,
+     "a black/white pair must never be flagged")
+
+  // Lab lives in two files for two different reasons; they must not drift.
+  for (const h of ["#4682b4", "#0a0a0a", "#f2c200", "#ffffff", "#204020"]) {
+    const a = CM.rgbToLab(hx(h))
+    const b = CN.toLab ? CN.toLab(hx(h)) : null
+    if (b) {
+      ok(Math.abs(a.L - b.L) < 1e-6 && Math.abs(a.a - b.a) < 1e-6 && Math.abs(a.b - b.b) < 1e-6,
+         "color-math and color-names disagree about Lab for " + h)
+    }
+  }
+
+  // The published matrices are the ones the code runs on, so a typo in the
+  // table is a typo in the page.
+  ok(Object.keys(CM.CVD_MATRICES).length === 3, "expected three CVD matrices")
+  for (const [name, m] of Object.entries(CM.CVD_MATRICES)) {
+    ok(m.length === 3 && m.every(row => row.length === 3), name + " is not a 3x3")
+    m.forEach((row, i) => {
+      const sum = row.reduce((a, b) => a + b, 0)
+      ok(Math.abs(sum - 1) < 0.05, `${name} row ${i} sums to ${sum.toFixed(4)}, not ~1 — white would not stay white`)
+    })
+  }
   if (problems.length) {
     console.error("math checks failed:")
     problems.forEach(p => console.error("  " + p))
@@ -835,6 +1046,7 @@ function assertMath() {
 assertMath()
 
 writeBoth("color-shades-generator", shadesGeneratorPage())
+writeBoth("color-blindness-simulator", colorBlindnessPage())
 writeBoth("color-name-finder", nameFinderPage())
 for (const family of FAMILIES) writeBoth(`shades-of-${family.key}`, familyPage(family))
 write("sitemap.xml", sitemap())
@@ -851,5 +1063,5 @@ if (check) {
   }
   console.log("generated files are up to date")
 } else {
-  console.log(`wrote ${FAMILIES.length} family pages + 2 tool pages (both URL forms), sitemap.xml, the homepage cards and the nav on every page`)
+  console.log(`wrote ${FAMILIES.length} family pages + 3 tool pages (both URL forms), sitemap.xml, the homepage cards and the nav on every page`)
 }
