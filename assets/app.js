@@ -1328,6 +1328,15 @@
     setHex(paramHex("hex", picker.value), null);
   }
 
+  /* ============================ OFFLINE ============================ */
+  // sw.js precaches every page and asset, so a page that loaded once opens
+  // again without a network. tools/build_color_pages.mjs writes sw.js.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js");
+    });
+  }
+
   /* ============================== BOOT ============================== */
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
