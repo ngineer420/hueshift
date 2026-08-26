@@ -390,47 +390,70 @@
   function initConverter() {
     var hexInput = document.getElementById("cc-hex-input");
     if (!hexInput) return;
-    var rgbInput = document.getElementById("cc-rgb-input");
-    var hslInput = document.getElementById("cc-hsl-input");
     var preview = document.getElementById("cc-preview");
     var error = document.getElementById("cc-error");
 
+    /* One entry per row. `show` renders an {r,g,b} as the row's text, and
+       `read` turns the row's text back into {r,g,b} or null. The three
+       original rows keep their bare "47, 230, 217" form, and the CSS Color 4
+       rows show the whole function so that the copy button yields a string a
+       stylesheet accepts as it is. Every row also accepts the other form on
+       paste: "hsl(174, 74%, 54%)" in the HSL row, "62% 0.19 260" in the
+       OKLCH row. */
+    var ROWS = [
+      { key: "hex", show: function (c) { return CM.rgbToHex(c.r, c.g, c.b); }, read: CM.hexToRgb },
+      { key: "rgb", wrap: "rgb", show: function (c) { return c.r + ", " + c.g + ", " + c.b; } },
+      { key: "hsl", wrap: "hsl", show: function (c) {
+        var h = CM.rgbToHsl(c.r, c.g, c.b);
+        return CM.round(h.h, 0) + ", " + CM.round(h.s, 0) + "%, " + CM.round(h.l, 0) + "%";
+      } },
+      { key: "oklch", wrap: "oklch", show: function (c) { return CM.formatOklch(CM.rgbToOklch(c)); } },
+      { key: "lch", wrap: "lch", show: function (c) { return CM.formatLch(CM.rgbToCssLch(c)); } },
+      { key: "lab", wrap: "lab", show: function (c) { return CM.formatLab(CM.rgbToCssLab(c)); } },
+      { key: "hwb", wrap: "hwb", show: function (c) { return CM.formatHwb(CM.rgbToHwb(c)); } },
+      { key: "cmyk", wrap: "cmyk", show: function (c) { return CM.formatCmyk(CM.rgbToCmyk(c)); } },
+    ];
+
+    function readWrapped(wrap) {
+      return function (text) {
+        var s = text.trim();
+        if (/^[a-z-]+\(/i.test(s)) return CM.parseColorString(s);
+        return CM.parseColorString(wrap + "(" + s + ")");
+      };
+    }
+
+    var rows = ROWS.map(function (row) {
+      var input = document.getElementById("cc-" + row.key + "-input");
+      if (!input) return null;
+      return { key: row.key, input: input, show: row.show, read: row.read || readWrapped(row.wrap) };
+    }).filter(Boolean);
+
     function setAll(rgb, skip) {
       var hex = CM.rgbToHex(rgb.r, rgb.g, rgb.b);
-      var hsl = CM.rgbToHsl(rgb.r, rgb.g, rgb.b);
-      if (skip !== "hex") hexInput.value = hex;
-      if (skip !== "rgb") rgbInput.value = rgb.r + ", " + rgb.g + ", " + rgb.b;
-      if (skip !== "hsl")
-        hslInput.value =
-          CM.round(hsl.h, 0) + ", " + CM.round(hsl.s, 0) + "%, " + CM.round(hsl.l, 0) + "%";
+      rows.forEach(function (row) {
+        if (row.key !== skip) row.input.value = row.show(rgb);
+        row.input.classList.remove("is-invalid");
+      });
       preview.style.background = hex;
       error.hidden = true;
       setShareUrl("cc-share-url", "color-converter", { c: bare(hex) });
     }
 
-    function fail() {
-      error.hidden = false;
-    }
-
-    hexInput.addEventListener("input", function () {
-      var rgb = CM.hexToRgb(hexInput.value);
-      if (rgb) setAll(rgb, "hex");
-      else fail();
+    rows.forEach(function (row) {
+      row.input.addEventListener("input", function () {
+        var rgb = row.read(row.input.value);
+        if (rgb) {
+          setAll(rgb, row.key);
+        } else {
+          row.input.classList.add("is-invalid");
+          error.hidden = false;
+        }
+      });
     });
 
-    rgbInput.addEventListener("input", function () {
-      var rgb = CM.parseColorString("rgb(" + rgbInput.value + ")");
-      if (rgb) setAll(rgb, "rgb");
-      else fail();
-    });
-
-    hslInput.addEventListener("input", function () {
-      var rgb = CM.parseColorString("hsl(" + hslInput.value + ")");
-      if (rgb) setAll(rgb, "hsl");
-      else fail();
-    });
-
-    setAll(CM.hexToRgb(paramHex("c", "#2fe6d9")));
+    // A landing page such as /hex-to-oklch/ opens on its own example colour.
+    var fallback = hexInput.getAttribute("data-default") || "#2fe6d9";
+    setAll(CM.hexToRgb(paramHex("c", fallback)));
   }
 
   /* ============================ GRADIENT (gg-) ============================ */
