@@ -1,0 +1,13 @@
+{
+  "name": "gamutlens.com — browser-only color tools",
+  "short_name": "gamutlens",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#121017",
+  "theme_color": "#121017",
+  "icons": [
+    { "src": "/assets/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
