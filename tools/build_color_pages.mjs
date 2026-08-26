@@ -10,6 +10,9 @@
  *
  *     color-shades-generator/index.html + .html alias
  *     color-name-finder/index.html      + .html alias
+ *     color-blindness-simulator/index.html + .html alias
+ *     color-converter/index.html        + .html alias
+ *     hex-to-oklch, rgb-to-cmyk, oklch-to-hex (the converter's pair pages)
  *     shades-of-<family>/index.html     + .html alias   (ten families)
  *     sitemap.xml
  *     the <ul class="tool-nav"> block in EVERY html file
@@ -526,6 +529,263 @@ ${SCRIPTS_NAMED}`
   return head({ title: "Color Name Finder — What Color Is This Hex? | gamutlens.com", description, canonical, jsonLd }) + "\n" + body
 }
 
+/* ------------------------------------------------ the converter and its pairs */
+
+/* One workspace, four pages. /color-converter/ shows all eight rows in the
+   order below. The pair pages (/hex-to-oklch/ and friends) show the same rows
+   with the pair moved to the front, so the answer to the query in the URL is
+   the first thing on the page and the rest of the converter is still there.
+   The row ids are what assets/app.js binds to, so the order is free. */
+const CONVERTER_ROWS = [
+  ["hex", "HEX", rgb => CM.rgbToHex(rgb.r, rgb.g, rgb.b)],
+  ["rgb", "RGB (r, g, b)", rgb => `${rgb.r}, ${rgb.g}, ${rgb.b}`],
+  ["hsl", "HSL (h, s%, l%)", rgb => {
+    const h = CM.rgbToHsl(rgb.r, rgb.g, rgb.b)
+    return `${CM.round(h.h, 0)}, ${CM.round(h.s, 0)}%, ${CM.round(h.l, 0)}%`
+  }],
+  ["oklch", "OKLCH", rgb => CM.formatOklch(CM.rgbToOklch(rgb))],
+  ["lch", "LCH", rgb => CM.formatLch(CM.rgbToCssLch(rgb))],
+  ["lab", "LAB", rgb => CM.formatLab(CM.rgbToCssLab(rgb))],
+  ["hwb", "HWB", rgb => CM.formatHwb(CM.rgbToHwb(rgb))],
+  ["cmyk", "CMYK", rgb => CM.formatCmyk(CM.rgbToCmyk(rgb))],
+]
+
+function converterWorkspace({ hex, lead = [] }) {
+  const rgb = CM.hexToRgb(hex)
+  const order = [
+    ...lead.map(key => CONVERTER_ROWS.find(r => r[0] === key)),
+    ...CONVERTER_ROWS.filter(r => !lead.includes(r[0])),
+  ]
+  const fields = order.map(([key, label, show]) => `      <div class="field">
+        <label for="cc-${key}-input">${label}</label>
+        <div class="field-copy">
+          <input type="text" id="cc-${key}-input" value="${esc(show(rgb))}"${key === "hex" ? ` data-default="${hex}"` : ""} spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-${key}-input" aria-label="Copy the ${label.split(" ")[0]} value">Copy</button>
+        </div>
+      </div>`).join("\n")
+  return `    <div class="swatch-preview" id="cc-preview" style="background:${hex}"></div>
+    <div class="controls-grid converter-grid">
+${fields}
+    </div>
+    <p id="cc-error" hidden style="color:var(--sig-magenta);font-size:13px;margin-top:-8px">That value did not parse. Check the format and try again.</p>
+    <div class="copy-row share-row">
+      <span class="label">Link</span>
+      <input type="text" class="value share-url" id="cc-share-url" readonly aria-label="Shareable link to this conversion">
+      <button type="button" class="copy-btn" data-copy-target="cc-share-url">Copy link</button>
+    </div>`
+}
+
+const CONVERTER_FAQ_SHARED = [
+  ["Which white point do lab() and lch() use?",
+   "D50, as the CSS Color Level 4 specification requires. The site converts sRGB to XYZ under its own D65 white and adapts to D50 with a Bradford transform, so a pasted lab() renders as the same color in a browser."],
+  ["Which OKLCH definition is this?",
+   "Björn Ottosson's 2020 OKLab, with the matrices the CSS specification cites. Chroma is shown to four decimals because three is not enough to round-trip saturated colors at the edge of sRGB."],
+  ["Is the CMYK a print profile?",
+   "No. It is the plain formula that most design tools show, with no ICC profile. Use it as a starting point and check a proof."],
+  ["Does this store or send my colors anywhere?",
+   "No. The conversion runs in your browser and makes no network requests."],
+]
+
+function converterPage() {
+  const canonical = SITE + "/color-converter/"
+  const description = "Convert colors between HEX, RGB, HSL, OKLCH, LCH, LAB, HWB and CMYK. Type into any field and the other seven update live. Free, private, works offline."
+  const faq = [
+    ["What formats does the RGB field accept?",
+     "Comma-separated numbers 0–255, for example “47, 230, 217”. A whole rgb() or rgba() function works too, in either the comma or the space syntax."],
+    ["Does the HSL field need the % signs?",
+     "Yes, for saturation and lightness, for example “174, 74%, 54%”. That matches how HSL is written in CSS."],
+    ["Can I convert 3-digit HEX shorthand like #2ec?",
+     "Yes. Shorthand hex is expanded automatically."],
+    ...CONVERTER_FAQ_SHARED,
+  ]
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org", "@type": "WebApplication",
+    name: "Color Converter — gamutlens.com", url: canonical,
+    applicationCategory: "DesignApplication", operatingSystem: "Any (runs in browser)",
+    description, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    publisher: { "@type": "Organization", name: "gamutlens.com" },
+  })
+
+  const body = `${header("/color-converter/")}
+  <main id="main">
+    <section class="panel">
+      <div class="wrap">
+        <div class="panel-head">
+          <h1 tabindex="-1">Color Converter</h1>
+          <a class="back-to-tools" href="/" data-panel-link="">← All tools</a>
+        </div>
+        <p>Type a color into any field and the other seven rewrite themselves at once. The oklch(), lch(), lab() and hwb() rows copy as complete CSS functions that a stylesheet accepts as they are.</p>
+        <div class="workspace">
+
+${converterWorkspace({ hex: "#2fe6d9" })}
+        </div>
+      </div>
+    </section>
+
+    <section class="content-section" id="how-it-works">
+      <div class="wrap">
+        <h2>How to use the Color Converter</h2>
+        <div class="how-to">
+          <ol>
+        <li>Type or paste a value into any field: HEX like #2fe6d9, RGB like 47, 230, 217, HSL like 174, 74%, 54%, or a whole CSS function such as oklch(62% 0.19 260).</li>
+        <li>The other fields and the preview swatch update as you type.</li>
+        <li>If a field turns red, the value did not parse. Check for stray characters or a missing # or % sign.</li>
+        <li>Click Copy next to the format you need.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+${faqBlock(faq)}
+
+    <section class="content-section">
+      <div class="wrap">
+        <h2>Related tools</h2>
+        <div class="related-links">
+        <a href="/hex-to-oklch/">HEX to OKLCH →</a>
+        <a href="/oklch-to-hex/">OKLCH to HEX →</a>
+        <a href="/rgb-to-cmyk/">RGB to CMYK →</a>
+        </div>
+        <div class="related-links" style="margin-top:12px">
+        <a href="/color-picker/">Color Picker →</a>
+        <a href="/gradient-generator/">Gradient Generator →</a>
+        <a href="/image-color-extractor/">Image Color Extractor →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+${FOOTER}
+  <script type="application/ld+json">${faqJsonLd(faq)}</script>
+${SCRIPTS_PLAIN}`
+
+  return head({ title: "Color Converter — HEX, RGB, HSL, OKLCH, LAB, CMYK | gamutlens.com", description, canonical, jsonLd }) + "\n" + body
+}
+
+/* The pair pages answer one query each. Same converter, the pair in front. */
+const PAIRS = [
+  {
+    slug: "hex-to-oklch", lead: ["hex", "oklch"], hex: "#3b82f6",
+    h1: "HEX to OKLCH", title: "HEX to OKLCH Converter — Free, Private | gamutlens.com",
+    description: "Convert a HEX color to CSS oklch() in your browser. Paste #3b82f6 and read oklch(62.31% 0.188 259.81), with LCH, LAB, HWB and CMYK beside it.",
+    intro: "Paste a HEX value and read the same color as a CSS oklch() function. The math is the OKLab definition that the CSS Color Level 4 specification uses, so the string you copy renders as the same color in every browser that supports oklch().",
+    howTo: [
+      "Paste a HEX value into the HEX field. Three-digit shorthand such as #38f works.",
+      "Read the oklch() function in the OKLCH field. Click Copy to put it on the clipboard.",
+      "Edit the OKLCH value to change the color. The HEX field follows.",
+    ],
+    faq: [
+      ["What do the three OKLCH numbers mean?",
+       "Lightness as a percentage from 0% (black) to 100% (white), chroma from 0 (grey) to about 0.37 at the most saturated sRGB colors, and hue in degrees. Equal steps in OKLCH lightness look like equal steps to the eye, which HSL lightness does not manage."],
+      ["Why does the chroma of #3b82f6 read 0.188 and not 0.214?",
+       "Because 0.214 is the chroma of the Tailwind v4 blue-500, which is a Display P3 color that no HEX value can express. #3b82f6 is the older sRGB blue-500, and its chroma is 0.188."],
+      ["Why does my oklch() differ from another tool in the last digit?",
+       "Rounding. This page shows two decimals of lightness and hue and four of chroma, which is the least that converts back to the same HEX. A tool that shows one decimal can lose up to five HEX steps at the edge of the sRGB gamut."],
+      ["Does this store or send my colors anywhere?",
+       "No. The conversion runs in your browser and makes no network requests."],
+    ],
+    related: [["/color-converter/", "Color Converter"], ["/oklch-to-hex/", "OKLCH to HEX"], ["/rgb-to-cmyk/", "RGB to CMYK"]],
+  },
+  {
+    slug: "rgb-to-cmyk", lead: ["rgb", "cmyk"], hex: "#3b82f6",
+    h1: "RGB to CMYK", title: "RGB to CMYK Converter — Free, Private | gamutlens.com",
+    description: "Convert RGB or HEX to CMYK percentages in your browser. Paste 59, 130, 246 and read cmyk(76% 47.2% 0% 3.5%), with HEX, HSL, OKLCH and LAB beside it.",
+    intro: "Paste an RGB triple and read the same color as four ink percentages. This is the plain formula: black is the shortfall of the strongest channel, and cyan, magenta and yellow are the shortfall of each channel after black. It matches what most design tools show as CMYK, and it is not a press profile.",
+    howTo: [
+      "Type the red, green and blue values into the RGB field, as 59, 130, 246 or as rgb(59 130 246).",
+      "Read the CMYK field. Click Copy to put the four percentages on the clipboard.",
+      "Type CMYK percentages to go the other way. The RGB and HEX fields follow.",
+    ],
+    faq: [
+      ["Will the printed color match my screen?",
+       "Not exactly. A screen mixes light and a press mixes ink, and the sRGB gamut and a press gamut do not cover each other. Pure #0000ff, for example, has no ink equivalent. Treat these percentages as a starting point and check a proof."],
+      ["Which CMYK formula is this?",
+       "The plain one: K = 1 − max(R, G, B), then C = (1 − R − K) ÷ (1 − K), and the same for M and Y. Adobe products use an ICC profile such as U.S. Web Coated (SWOP) instead, so their numbers differ by a few percent."],
+      ["Does the CMYK field accept values without percent signs?",
+       "Yes. Numbers from 0 to 1 are read as fractions and numbers above 1 as percentages, so 0.76, 0.47, 0, 0.04 and 76, 47, 0, 4 give the same color."],
+      ["Does this store or send my colors anywhere?",
+       "No. The conversion runs in your browser and makes no network requests."],
+    ],
+    related: [["/color-converter/", "Color Converter"], ["/hex-to-oklch/", "HEX to OKLCH"], ["/image-color-extractor/", "Image Color Extractor"]],
+  },
+  {
+    slug: "oklch-to-hex", lead: ["oklch", "hex"], hex: "#3b82f6",
+    h1: "OKLCH to HEX", title: "OKLCH to HEX Converter — Free, Private | gamutlens.com",
+    description: "Convert a CSS oklch() color to HEX in your browser. Paste oklch(62.31% 0.188 259.81) and read #3b82f6, with RGB, HSL, LAB, HWB and CMYK beside it.",
+    intro: "Paste an oklch() function and read the HEX value that renders the same color. A color outside the sRGB gamut is clipped channel by channel to the nearest HEX. That is a different rule from the chroma reduction a browser applies, so a strongly saturated oklch() can land a few steps away from what the browser renders.",
+    howTo: [
+      "Paste the oklch() function into the OKLCH field. Lightness works as a percentage or as a number from 0 to 1.",
+      "Read the HEX field. Click Copy to put it on the clipboard.",
+      "Edit any other field to go the other way. The OKLCH field follows.",
+    ],
+    faq: [
+      ["Does the field accept oklch(0.62 0.19 260) without the percent sign?",
+       "Yes. Lightness as 0 to 1 or as 0% to 100%, chroma as a number or as a percentage of 0.4, and hue as a bare number or with deg, rad, grad or turn. The commas of the older syntax work as well."],
+      ["What happens to an oklch() color that sRGB cannot show?",
+       "Each of red, green and blue is clipped to the 0–255 range. The result is the nearest HEX in channel terms, which can be a little lighter or less saturated than the color you asked for."],
+      ["Why design in OKLCH if the CSS ends up as HEX?",
+       "Because OKLCH is the space to reason in. Two colors with the same OKLCH lightness look equally bright, and a hue rotation keeps the lightness. HEX is what older browsers and most design tools still read."],
+      ["Does this store or send my colors anywhere?",
+       "No. The conversion runs in your browser and makes no network requests."],
+    ],
+    related: [["/color-converter/", "Color Converter"], ["/hex-to-oklch/", "HEX to OKLCH"], ["/rgb-to-cmyk/", "RGB to CMYK"]],
+  },
+]
+
+function pairPage(pair) {
+  const canonical = `${SITE}/${pair.slug}/`
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org", "@type": "WebApplication",
+    name: `${pair.h1} — gamutlens.com`, url: canonical,
+    applicationCategory: "DesignApplication", operatingSystem: "Any (runs in browser)",
+    description: pair.description, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    publisher: { "@type": "Organization", name: "gamutlens.com" },
+  })
+
+  const body = `${header(`/${pair.slug}/`)}
+  <main id="main">
+    <section class="panel">
+      <div class="wrap">
+        <div class="panel-head">
+          <h1 tabindex="-1">${esc(pair.h1)}</h1>
+          <a class="back-to-tools" href="/color-converter/">← Color converter</a>
+        </div>
+        <p>${esc(pair.intro)}</p>
+        <div class="workspace">
+
+${converterWorkspace({ hex: pair.hex, lead: pair.lead })}
+        </div>
+      </div>
+    </section>
+
+    <section class="content-section" id="how-it-works">
+      <div class="wrap">
+        <h2>How to convert ${esc(pair.h1)}</h2>
+        <div class="how-to">
+          <ol>
+${pair.howTo.map(step => `        <li>${esc(step)}</li>`).join("\n")}
+          </ol>
+        </div>
+      </div>
+    </section>
+
+${faqBlock(pair.faq)}
+
+    <section class="content-section">
+      <div class="wrap">
+        <h2>Related tools</h2>
+        <div class="related-links">
+${pair.related.map(([href, label]) => `        <a href="${href}">${label} →</a>`).join("\n")}
+        </div>
+      </div>
+    </section>
+  </main>
+${FOOTER}
+  <script type="application/ld+json">${faqJsonLd(pair.faq)}</script>
+${SCRIPTS_PLAIN}`
+
+  return head({ title: pair.title, description: pair.description, canonical, jsonLd }) + "\n" + body
+}
+
 /* ---------------------------------------------------- the family landing pages */
 
 function familyPage(family) {
@@ -805,6 +1065,8 @@ const GENERATED = new Set([
   "color-shades-generator/index.html", "color-shades-generator.html",
   "color-name-finder/index.html", "color-name-finder.html",
   "color-blindness-simulator/index.html", "color-blindness-simulator.html",
+  "color-converter/index.html", "color-converter.html",
+  ...PAIRS.flatMap(p => [`${p.slug}/index.html`, `${p.slug}.html`]),
 ])
 
 /** Rewrite the whole chrome — header plus toolbar — in a hand-written page.
@@ -869,6 +1131,8 @@ const CARD_BEGIN = "<!-- BEGIN generated tool cards (tools/build_color_pages.mjs
 const CARD_END = "<!-- END generated tool cards -->"
 const FAM_BEGIN = "<!-- BEGIN generated family links (tools/build_color_pages.mjs) -->"
 const FAM_END = "<!-- END generated family links -->"
+const CONV_BEGIN = "<!-- BEGIN generated converter workspace (tools/build_color_pages.mjs) -->"
+const CONV_END = "<!-- END generated converter workspace -->"
 
 function homepageCards() {
   const cards = [
@@ -915,6 +1179,9 @@ function syncHomepage() {
   const file = join(ROOT, "index.html")
   splice(file, CARD_BEGIN, CARD_END, homepageCards(), "tool cards")
   splice(file, FAM_BEGIN, FAM_END, homepageFamilyLinks(), "family links")
+  // The homepage panel is the same workspace as /color-converter/, so the two
+  // cannot drift apart in their row set or their default colour.
+  splice(file, CONV_BEGIN, CONV_END, converterWorkspace({ hex: "#2fe6d9" }), "converter workspace")
 }
 
 function sitemap() {
@@ -922,6 +1189,7 @@ function sitemap() {
     "/", "/color-picker/", "/color-converter/", "/gradient-generator/",
     "/color-palette-generator/", "/contrast-checker/", "/image-color-extractor/",
     "/color-shades-generator/", "/color-name-finder/", "/color-blindness-simulator/",
+    ...PAIRS.map(p => `/${p.slug}/`),
     ...FAMILIES.map(f => `/shades-of-${f.key}/`),
     "/privacy/", "/terms/", "/articles/",
     "/articles/hex-rgb-hsl-which-color-format-to-use/",
@@ -1035,6 +1303,51 @@ function assertMath() {
       ok(Math.abs(sum - 1) < 0.05, `${name} row ${i} sums to ${sum.toFixed(4)}, not ~1 — white would not stay white`)
     })
   }
+  /* The converter's CSS Color 4 rows. Every string a row shows must parse
+     back to the byte triple it came from, within one byte, across every
+     3-digit hex: 4096 colours that include every gamut corner. The precision
+     in the format functions was chosen against this exact sweep. */
+  const ROW_FORMATS = {
+    oklch: rgb => CM.formatOklch(CM.rgbToOklch(rgb)),
+    lch: rgb => CM.formatLch(CM.rgbToCssLch(rgb)),
+    lab: rgb => CM.formatLab(CM.rgbToCssLab(rgb)),
+    hwb: rgb => CM.formatHwb(CM.rgbToHwb(rgb)),
+    cmyk: rgb => CM.formatCmyk(CM.rgbToCmyk(rgb)),
+  }
+  for (let i = 0; i < 4096; i++) {
+    const hex = "#" + i.toString(16).padStart(3, "0")
+    const rgb = CM.hexToRgb(hex)
+    for (const [name, fmt] of Object.entries(ROW_FORMATS)) {
+      const text = fmt(rgb)
+      const back = CM.parseColorString(text)
+      const off = back ? Math.max(Math.abs(back.r - rgb.r), Math.abs(back.g - rgb.g), Math.abs(back.b - rgb.b)) : Infinity
+      if (off > 1) { problems.push(`${name}: ${hex} -> ${text} -> off by ${off}`); break }
+    }
+  }
+  // The values the issue and the pair pages quote for #3b82f6.
+  const blue = CM.hexToRgb("#3b82f6")
+  ok(ROW_FORMATS.oklch(blue) === "oklch(62.31% 0.188 259.81)", "#3b82f6 oklch is " + ROW_FORMATS.oklch(blue))
+  ok(ROW_FORMATS.lab(blue) === "lab(54.62 8.76 -65.79)", "#3b82f6 lab is " + ROW_FORMATS.lab(blue))
+  ok(ROW_FORMATS.hwb(blue) === "hwb(217.2 23.1% 3.5%)", "#3b82f6 hwb is " + ROW_FORMATS.hwb(blue))
+  ok(ROW_FORMATS.cmyk(blue) === "cmyk(76% 47.2% 0% 3.5%)", "#3b82f6 cmyk is " + ROW_FORMATS.cmyk(blue))
+  // The syntax variants a paste can carry.
+  const same = (text, hex) => {
+    const c = CM.parseColorString(text)
+    ok(c && CM.rgbToHex(c.r, c.g, c.b) === hex, `parse ${JSON.stringify(text)} -> ${c ? CM.rgbToHex(c.r, c.g, c.b) : null}, expected ${hex}`)
+  }
+  same("rgb(59 130 246 / 50%)", "#3b82f6")
+  same("rgba(59, 130, 246, 0.5)", "#3b82f6")
+  same("hsl(217deg 91% 60%)", "#3c83f6")
+  same("oklch(0.6231 0.188 259.81)", "#3b82f6")
+  same("oklch(62.31% 47% 0.7217turn)", "#3b82f6")
+  same("oklab(62.31% -0.0332 -0.1850)", "#3b82f6")
+  same("lch(54.62% 66.37 277.59)", "#3b82f6")
+  same("hwb(217.2 23.1% 3.5%)", "#3b82f6")
+  same("cmyk(76, 47.2, 0, 3.5)", "#3b82f6")
+  same("device-cmyk(0.76 0.472 0 0.035)", "#3b82f6")
+  same("oklch(none 0 none)", "#000000")
+  ok(CM.parseColorString("oklch(62% 0.19)") === null, "a two-channel oklch() must not parse")
+  ok(CM.parseColorString("plum(1 2 3)") === null, "an unknown function must not parse")
   if (problems.length) {
     console.error("math checks failed:")
     problems.forEach(p => console.error("  " + p))
@@ -1048,6 +1361,8 @@ assertMath()
 writeBoth("color-shades-generator", shadesGeneratorPage())
 writeBoth("color-blindness-simulator", colorBlindnessPage())
 writeBoth("color-name-finder", nameFinderPage())
+writeBoth("color-converter", converterPage())
+for (const pair of PAIRS) writeBoth(pair.slug, pairPage(pair))
 for (const family of FAMILIES) writeBoth(`shades-of-${family.key}`, familyPage(family))
 write("sitemap.xml", sitemap())
 syncHomepage()
@@ -1063,5 +1378,5 @@ if (check) {
   }
   console.log("generated files are up to date")
 } else {
-  console.log(`wrote ${FAMILIES.length} family pages + 3 tool pages (both URL forms), sitemap.xml, the homepage cards and the nav on every page`)
+  console.log(`wrote ${FAMILIES.length} family pages + ${4 + PAIRS.length} tool pages (both URL forms), sitemap.xml, the homepage cards and the nav on every page`)
 }

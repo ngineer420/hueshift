@@ -1748,3 +1748,42 @@ input.share-url:focus-visible {
 
 .pg-cvd-row { margin: 14px 0 0; }
 .pg-cvd-link { font-size: 13.5px; font-weight: 600; }
+
+/* Converter rows: the value and its copy button share one line, so a row a
+   person pastes into a stylesheet is one click away. The whole grid stays on
+   the same auto-fit columns as every other tool. */
+/* Wider columns than the default 200px: an oklch() string is 26 characters
+   of monospace, and a 4-column grid at desktop width clipped it to 14. */
+.converter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.field-copy {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.field-copy input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-copy button.copy-btn {
+  padding: 6px 12px;
+}
+
+.field input[type="text"].is-invalid {
+  border-color: var(--sig-magenta);
+  color: var(--sig-magenta);
+}
+
+/* On a phone the column is about 230px wide. A 26-character oklch() string
+   needs a smaller type size and a tighter pad to stay inside the box. */
+@media (max-width: 480px) {
+  .field-copy input[type="text"] {
+    font-size: 13px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}

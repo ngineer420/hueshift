@@ -199,30 +199,76 @@
           <h2 tabindex="-1">Color Converter</h2>
           <a class="back-to-tools" href="/" data-panel-link="">← All tools</a>
         </div>
-        <p>Type a color into the HEX, RGB or HSL field and the other two rewrite themselves immediately — useful when a designer hands you a HEX and your CSS variables want HSL, or the other way around.</p>
+        <p>Type a color into any field and the other seven rewrite themselves at once. The oklch(), lch(), lab() and hwb() rows copy as complete CSS functions that a stylesheet accepts as they are.</p>
         <div class="workspace">
 
-    <div class="swatch-preview" id="cc-preview"></div>
-    <div class="controls-grid">
+<!-- BEGIN generated converter workspace (tools/build_color_pages.mjs) -->
+    <div class="swatch-preview" id="cc-preview" style="background:#2fe6d9"></div>
+    <div class="controls-grid converter-grid">
       <div class="field">
         <label for="cc-hex-input">HEX</label>
-        <input type="text" id="cc-hex-input" value="#2fe6d9">
+        <div class="field-copy">
+          <input type="text" id="cc-hex-input" value="#2fe6d9" data-default="#2fe6d9" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-hex-input" aria-label="Copy the HEX value">Copy</button>
+        </div>
       </div>
       <div class="field">
         <label for="cc-rgb-input">RGB (r, g, b)</label>
-        <input type="text" id="cc-rgb-input" value="47, 230, 217">
+        <div class="field-copy">
+          <input type="text" id="cc-rgb-input" value="47, 230, 217" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-rgb-input" aria-label="Copy the RGB value">Copy</button>
+        </div>
       </div>
       <div class="field">
         <label for="cc-hsl-input">HSL (h, s%, l%)</label>
-        <input type="text" id="cc-hsl-input" value="174, 74%, 54%">
+        <div class="field-copy">
+          <input type="text" id="cc-hsl-input" value="176, 79%, 54%" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-hsl-input" aria-label="Copy the HSL value">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cc-oklch-input">OKLCH</label>
+        <div class="field-copy">
+          <input type="text" id="cc-oklch-input" value="oklch(83.67% 0.1384 187.33)" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-oklch-input" aria-label="Copy the OKLCH value">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cc-lch-input">LCH</label>
+        <div class="field-copy">
+          <input type="text" id="cc-lch-input" value="lch(82.68 47.92 188.33)" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-lch-input" aria-label="Copy the LCH value">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cc-lab-input">LAB</label>
+        <div class="field-copy">
+          <input type="text" id="cc-lab-input" value="lab(82.68 -47.42 -6.94)" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-lab-input" aria-label="Copy the LAB value">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cc-hwb-input">HWB</label>
+        <div class="field-copy">
+          <input type="text" id="cc-hwb-input" value="hwb(175.7 18.4% 9.8%)" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-hwb-input" aria-label="Copy the HWB value">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cc-cmyk-input">CMYK</label>
+        <div class="field-copy">
+          <input type="text" id="cc-cmyk-input" value="cmyk(79.6% 0% 5.7% 9.8%)" spellcheck="false" autocomplete="off">
+          <button type="button" class="copy-btn" data-copy-target="cc-cmyk-input" aria-label="Copy the CMYK value">Copy</button>
+        </div>
       </div>
     </div>
-    <p id="cc-error" hidden style="color:var(--sig-magenta);font-size:13px;margin-top:-8px">Couldn't parse that value — check the format and try again.</p>
+    <p id="cc-error" hidden style="color:var(--sig-magenta);font-size:13px;margin-top:-8px">That value did not parse. Check the format and try again.</p>
     <div class="copy-row share-row">
       <span class="label">Link</span>
       <input type="text" class="value share-url" id="cc-share-url" readonly aria-label="Shareable link to this conversion">
       <button type="button" class="copy-btn" data-copy-target="cc-share-url">Copy link</button>
     </div>
+<!-- END generated converter workspace -->
         </div>
         <p style="margin-top:16px;font-size:14px"><a href="/color-converter/#how-it-works">Full guide &amp; FAQ for the Color Converter →</a></p>
       </div>

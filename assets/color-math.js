@@ -124,34 +124,113 @@
 
   // ---- Parsing free-form strings ---------------------------------------
 
-  /** Accepts hex, "rgb(a)(...)" or "hsl(a)(...)" strings -> {r,g,b} or null. */
+  /**
+   * Split "name(a, b, c)" or "name(a b c / alpha)" into its function name and
+   * its three channel tokens. Both the legacy comma syntax and the CSS Color 4
+   * space syntax land here. The alpha, if any, is dropped: every consumer on
+   * this site is opaque. Returns null when the string is not a colour function.
+   */
+  function splitColorFunction(s) {
+    var m = s.match(/^([a-z-]+)\(\s*([^)]*?)\s*\)$/i);
+    if (!m) return null;
+    var body = m[2].split("/")[0].trim();
+    var parts = body.split(/\s*,\s*|\s+/).filter(function (p) {
+      return p !== "";
+    });
+    if (parts.length !== 3 && parts.length !== 4) return null;
+    return { name: m[1].toLowerCase(), parts: parts };
+  }
+
+  /**
+   * One CSS channel token -> a number.
+   *   "62.3%"  -> 62.3 * pct / 100   (pct is what 100% means for this channel)
+   *   "259.8deg", "1.2rad", "0.7turn" -> degrees
+   *   "none"   -> 0
+   * Returns NaN when the token is not a number.
+   */
+  function channel(token, pct) {
+    var t = String(token).toLowerCase();
+    if (t === "none") return 0;
+    var m = t.match(/^(-?\d*\.?\d+(?:e[-+]?\d+)?)(%|deg|rad|grad|turn)?$/);
+    if (!m) return NaN;
+    var n = parseFloat(m[1]);
+    switch (m[2]) {
+      case "%":
+        return (n * pct) / 100;
+      case "rad":
+        return (n * 180) / Math.PI;
+      case "grad":
+        return n * 0.9;
+      case "turn":
+        return n * 360;
+      default:
+        return n;
+    }
+  }
+
+  function finite(list) {
+    for (var i = 0; i < list.length; i++) if (!isFinite(list[i])) return false;
+    return true;
+  }
+
+  /**
+   * Accepts a hex string or any of these CSS colour functions -> {r,g,b} or null:
+   * rgb(), rgba(), hsl(), hsla(), hwb(), lab(), lch(), oklab(), oklch(),
+   * cmyk() and device-cmyk(). Commas or spaces between channels, an optional
+   * "/ alpha", and the CSS Color 4 units (%, deg, rad, turn, none).
+   */
   function parseColorString(str) {
     if (typeof str !== "string") return null;
     var s = str.trim();
-
-    var rgbMatch = s.match(
-      /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*[\d.]+\s*)?\)$/i
-    );
-    if (rgbMatch) {
-      return {
-        r: clamp(parseInt(rgbMatch[1], 10), 0, 255),
-        g: clamp(parseInt(rgbMatch[2], 10), 0, 255),
-        b: clamp(parseInt(rgbMatch[3], 10), 0, 255),
-      };
+    var fn = splitColorFunction(s);
+    if (!fn) return hexToRgb(s);
+    var p = fn.parts;
+    var v;
+    switch (fn.name) {
+      case "rgb":
+      case "rgba":
+        v = [channel(p[0], 255), channel(p[1], 255), channel(p[2], 255)];
+        if (!finite(v)) return null;
+        return {
+          r: clamp(Math.round(v[0]), 0, 255),
+          g: clamp(Math.round(v[1]), 0, 255),
+          b: clamp(Math.round(v[2]), 0, 255),
+        };
+      case "hsl":
+      case "hsla":
+        v = [channel(p[0], 360), channel(p[1], 100), channel(p[2], 100)];
+        return finite(v) ? hslToRgb(v[0], v[1], v[2]) : null;
+      case "hwb":
+        v = [channel(p[0], 360), channel(p[1], 100), channel(p[2], 100)];
+        return finite(v) ? hwbToRgb(v[0], v[1], v[2]) : null;
+      case "lab":
+        v = [channel(p[0], 100), channel(p[1], 125), channel(p[2], 125)];
+        return finite(v) ? labToRgb({ L: v[0], a: v[1], b: v[2] }) : null;
+      case "lch":
+        v = [channel(p[0], 100), channel(p[1], 150), channel(p[2], 360)];
+        return finite(v) ? labToRgb(lchToLab({ L: v[0], C: v[1], H: v[2] })) : null;
+      case "oklab":
+        v = [channel(p[0], 1), channel(p[1], 0.4), channel(p[2], 0.4)];
+        return finite(v) ? oklabToRgb({ L: v[0], a: v[1], b: v[2] }) : null;
+      case "oklch":
+        v = [channel(p[0], 1), channel(p[1], 0.4), channel(p[2], 360)];
+        return finite(v) ? oklabToRgb(oklchToOklab({ L: v[0], C: v[1], H: v[2] })) : null;
+      case "cmyk":
+      case "device-cmyk":
+        if (p.length !== 4) return null;
+        v = [channel(p[0], 1), channel(p[1], 1), channel(p[2], 1), channel(p[3], 1)];
+        if (!finite(v)) return null;
+        // Bare numbers above 1 are percentages written without the sign,
+        // which is how print specs and the converter's own row write them.
+        if (v[0] > 1 || v[1] > 1 || v[2] > 1 || v[3] > 1) {
+          v = v.map(function (n) {
+            return n / 100;
+          });
+        }
+        return cmykToRgb(v[0], v[1], v[2], v[3]);
+      default:
+        return null;
     }
-
-    var hslMatch = s.match(
-      /^hsla?\(\s*(-?[\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*(?:,\s*[\d.]+\s*)?\)$/i
-    );
-    if (hslMatch) {
-      return hslToRgb(
-        parseFloat(hslMatch[1]),
-        parseFloat(hslMatch[2]),
-        parseFloat(hslMatch[3])
-      );
-    }
-
-    return hexToRgb(s);
   }
 
   function formatRgb(r, g, b) {
@@ -396,6 +475,260 @@
     return Math.sqrt(dL * dL + da * da + db * db);
   }
 
+  // ---- CSS Color 4 spaces: lab(), lch(), oklab(), oklch(), hwb(), cmyk -----
+
+  /* The converter shows these so that a person can paste the row straight
+   * into a stylesheet. That sets the white point: CSS lab() and lch() are
+   * D50-referenced, so the pipeline is sRGB -> XYZ (D65, the native sRGB
+   * white) -> Bradford adaptation to D50 -> Lab. rgbToLab() above stays D65,
+   * because deltaE76() and color-names.js only need distances and both files
+   * assert that they agree. The two must not be swapped for each other.
+   *
+   * OKLab uses the matrices from Bjorn Ottosson's 2020 definition, which is
+   * what the CSS specification cites. OKLab is defined against D65 directly,
+   * so it takes no adaptation step.
+   */
+
+  /** Linear-light sRGB (0-1) -> XYZ, D65 white. */
+  function linearToXyz(R, G, B) {
+    return {
+      x: R * 0.4123907993 + G * 0.3575843394 + B * 0.1804807884,
+      y: R * 0.2126390059 + G * 0.7151686788 + B * 0.0721923154,
+      z: R * 0.0193308187 + G * 0.1191947798 + B * 0.9505321522,
+    };
+  }
+
+  /** XYZ (D65) -> linear-light sRGB (0-1), unclamped. */
+  function xyzToLinear(x, y, z) {
+    return {
+      R: x * 3.2409699419 - y * 1.5373831776 - z * 0.4986107603,
+      G: -x * 0.9692436363 + y * 1.8759675015 + z * 0.0415550574,
+      B: x * 0.0556300797 - y * 0.2039769589 + z * 1.0569715142,
+    };
+  }
+
+  /* Bradford chromatic adaptation, D65 -> D50 and back. */
+  function d65ToD50(c) {
+    return {
+      x: c.x * 1.0479298208 + c.y * 0.0229467933 - c.z * 0.0501922295,
+      y: c.x * 0.0296278157 + c.y * 0.9904344267 - c.z * 0.0170738236,
+      z: -c.x * 0.0092430581 + c.y * 0.0150551448 + c.z * 0.7518742899,
+    };
+  }
+
+  function d50ToD65(c) {
+    return {
+      x: c.x * 0.9554734527 - c.y * 0.0230985479 + c.z * 0.0632593087,
+      y: -c.x * 0.0283697070 + c.y * 1.0099954580 + c.z * 0.0210413989,
+      z: c.x * 0.0123140016 - c.y * 0.0205076412 + c.z * 1.3303659366,
+    };
+  }
+
+  var D50 = { x: 0.3457 / 0.3585, y: 1, z: (1 - 0.3457 - 0.3585) / 0.3585 };
+  var LAB_EPSILON = 216 / 24389;
+  var LAB_KAPPA = 24389 / 27;
+
+  function labForward(t) {
+    return t > LAB_EPSILON ? Math.cbrt(t) : (LAB_KAPPA * t + 16) / 116;
+  }
+
+  function labInverse(t) {
+    var t3 = t * t * t;
+    return t3 > LAB_EPSILON ? t3 : (116 * t - 16) / LAB_KAPPA;
+  }
+
+  function linearOf(rgb) {
+    return linearToXyz(
+      srgbChannelToLinear(rgb.r),
+      srgbChannelToLinear(rgb.g),
+      srgbChannelToLinear(rgb.b)
+    );
+  }
+
+  function bytesOf(lin) {
+    return {
+      r: linearToSrgbByte(lin.R),
+      g: linearToSrgbByte(lin.G),
+      b: linearToSrgbByte(lin.B),
+    };
+  }
+
+  /** {r,g,b} 0-255 -> CSS lab() {L 0-100, a, b}, D50 white. */
+  function rgbToCssLab(rgb) {
+    var c = d65ToD50(linearOf(rgb));
+    var fx = labForward(c.x / D50.x);
+    var fy = labForward(c.y / D50.y);
+    var fz = labForward(c.z / D50.z);
+    return { L: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
+  }
+
+  /** CSS lab() {L,a,b} -> {r,g,b} 0-255, clipped to the sRGB gamut. */
+  function labToRgb(lab) {
+    var fy = (lab.L + 16) / 116;
+    var fx = lab.a / 500 + fy;
+    var fz = fy - lab.b / 200;
+    var xyz = d50ToD65({
+      x: labInverse(fx) * D50.x,
+      y: labInverse(fy) * D50.y,
+      z: labInverse(fz) * D50.z,
+    });
+    return bytesOf(xyzToLinear(xyz.x, xyz.y, xyz.z));
+  }
+
+  /** Any {L,a,b} -> {L,C,H}. Hue is 0-360, and 0 for a neutral. */
+  function labToLch(lab) {
+    var C = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    var H = (Math.atan2(lab.b, lab.a) * 180) / Math.PI;
+    if (H < 0) H += 360;
+    // Below this chroma the hue is floating-point noise, and a stable 0 keeps
+    // greys from showing a different hue every time they are typed.
+    if (C < 1e-4) H = 0;
+    return { L: lab.L, C: C, H: H };
+  }
+
+  /** {L,C,H} -> {L,a,b}. */
+  function lchToLab(lch) {
+    var h = (lch.H * Math.PI) / 180;
+    return { L: lch.L, a: lch.C * Math.cos(h), b: lch.C * Math.sin(h) };
+  }
+
+  function rgbToCssLch(rgb) {
+    return labToLch(rgbToCssLab(rgb));
+  }
+
+  /** {r,g,b} 0-255 -> OKLab {L 0-1, a, b}. */
+  function rgbToOklab(rgb) {
+    var R = srgbChannelToLinear(rgb.r);
+    var G = srgbChannelToLinear(rgb.g);
+    var B = srgbChannelToLinear(rgb.b);
+    var l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+    var m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+    var s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+    return {
+      L: 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+      a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+      b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+    };
+  }
+
+  /** OKLab {L,a,b} -> {r,g,b} 0-255, clipped to the sRGB gamut. */
+  function oklabToRgb(lab) {
+    var l = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+    var m = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+    var s = lab.L - 0.0894841775 * lab.a - 1.291485548 * lab.b;
+    l = l * l * l;
+    m = m * m * m;
+    s = s * s * s;
+    return bytesOf({
+      R: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      G: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      B: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    });
+  }
+
+  function oklabToOklch(lab) {
+    return labToLch(lab);
+  }
+
+  function oklchToOklab(lch) {
+    return lchToLab(lch);
+  }
+
+  function rgbToOklch(rgb) {
+    return labToLch(rgbToOklab(rgb));
+  }
+
+  /** {r,g,b} 0-255 -> HWB {h 0-360, w 0-100, b 0-100}. */
+  function rgbToHwb(rgb) {
+    var max = Math.max(rgb.r, rgb.g, rgb.b);
+    var min = Math.min(rgb.r, rgb.g, rgb.b);
+    var h = max === min ? 0 : rgbToHsl(rgb.r, rgb.g, rgb.b).h;
+    return { h: h, w: (min / 255) * 100, b: (1 - max / 255) * 100 };
+  }
+
+  /** h (0-360), w (0-100), b (0-100) -> {r,g,b} 0-255. */
+  function hwbToRgb(h, w, b) {
+    w = clamp(w, 0, 100) / 100;
+    b = clamp(b, 0, 100) / 100;
+    if (w + b >= 1) {
+      var grey = Math.round((w / (w + b)) * 255);
+      return { r: grey, g: grey, b: grey };
+    }
+    var pure = hslToRgb(h, 100, 50);
+    var scale = 1 - w - b;
+    return {
+      r: Math.round((pure.r / 255) * scale * 255 + w * 255),
+      g: Math.round((pure.g / 255) * scale * 255 + w * 255),
+      b: Math.round((pure.b / 255) * scale * 255 + w * 255),
+    };
+  }
+
+  /** {r,g,b} 0-255 -> CMYK {c,m,y,k} 0-100. Naive, no ink profile. */
+  function rgbToCmyk(rgb) {
+    var r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+    var k = 1 - Math.max(r, g, b);
+    if (k >= 1) return { c: 0, m: 0, y: 0, k: 100 };
+    return {
+      c: ((1 - r - k) / (1 - k)) * 100,
+      m: ((1 - g - k) / (1 - k)) * 100,
+      y: ((1 - b - k) / (1 - k)) * 100,
+      k: k * 100,
+    };
+  }
+
+  /** c, m, y, k as 0-1 fractions -> {r,g,b} 0-255. */
+  function cmykToRgb(c, m, y, k) {
+    c = clamp(c, 0, 1);
+    m = clamp(m, 0, 1);
+    y = clamp(y, 0, 1);
+    k = clamp(k, 0, 1);
+    return {
+      r: Math.round(255 * (1 - c) * (1 - k)),
+      g: Math.round(255 * (1 - m) * (1 - k)),
+      b: Math.round(255 * (1 - y) * (1 - k)),
+    };
+  }
+
+  /* Formatting. Each string parses back through parseColorString() to the
+   * same sRGB byte triple, which is what the round-trip test in
+   * tools/build_color_pages.mjs asserts over every 3-digit hex. The precision
+   * per channel is the least that keeps every one of those within one byte:
+   * two decimals on the Lab and LCH axes and on OKLCH lightness and hue, four
+   * on OKLCH chroma, whose whole sRGB range is 0 to about 0.37. One decimal
+   * looks tidier and is not enough: near the gamut edge a channel sits at
+   * linear-light zero, where the sRGB curve is steepest, and rounding 0.001
+   * off the chroma of #00f moves the red byte by three. HWB and CMYK are
+   * linear in the bytes, so one decimal of a percent is plenty there.
+   * Trailing zeros are dropped: a grey reads hwb(0 50% 50%), not hwb(0 50.0% 50.0%).
+   */
+  function trim(n, places) {
+    var s = round(n, places).toFixed(places);
+    if (places > 0) s = s.replace(/\.?0+$/, "");
+    return s === "-0" ? "0" : s;
+  }
+
+  function formatOklch(c) {
+    return "oklch(" + trim(c.L * 100, 2) + "% " + trim(c.C, 4) + " " + trim(c.H, 2) + ")";
+  }
+
+  function formatLch(c) {
+    return "lch(" + trim(c.L, 2) + " " + trim(c.C, 2) + " " + trim(c.H, 2) + ")";
+  }
+
+  function formatLab(c) {
+    return "lab(" + trim(c.L, 2) + " " + trim(c.a, 2) + " " + trim(c.b, 2) + ")";
+  }
+
+  function formatHwb(c) {
+    return "hwb(" + trim(c.h, 1) + " " + trim(c.w, 1) + "% " + trim(c.b, 1) + "%)";
+  }
+
+  function formatCmyk(c) {
+    return (
+      "cmyk(" + trim(c.c, 1) + "% " + trim(c.m, 1) + "% " + trim(c.y, 1) + "% " + trim(c.k, 1) + "%)"
+    );
+  }
+
   // ---- Colour vision deficiency simulation ---------------------------------
 
   /*
@@ -556,6 +889,25 @@
     paletteScheme: paletteScheme,
     rgbToLab: rgbToLab,
     deltaE76: deltaE76,
+    rgbToCssLab: rgbToCssLab,
+    labToRgb: labToRgb,
+    rgbToCssLch: rgbToCssLch,
+    labToLch: labToLch,
+    lchToLab: lchToLab,
+    rgbToOklab: rgbToOklab,
+    oklabToRgb: oklabToRgb,
+    rgbToOklch: rgbToOklch,
+    oklabToOklch: oklabToOklch,
+    oklchToOklab: oklchToOklab,
+    rgbToHwb: rgbToHwb,
+    hwbToRgb: hwbToRgb,
+    rgbToCmyk: rgbToCmyk,
+    cmykToRgb: cmykToRgb,
+    formatOklch: formatOklch,
+    formatLch: formatLch,
+    formatLab: formatLab,
+    formatHwb: formatHwb,
+    formatCmyk: formatCmyk,
     simulateDeficiency: simulateDeficiency,
     collapsedPairs: collapsedPairs,
     CVD_MATRICES: CVD_MATRICES,
