@@ -1280,12 +1280,16 @@ input.share-url:focus-visible {
 /* Related tools: the sibling sites in this portfolio. The footer .wrap is a
    wrapping flex row, so the block claims a whole line of its own rather than
    competing with the tag and the legal links for the same row. */
-.peer-sites {
-  flex: 1 0 100%;
-  margin: 4px 0 6px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+/* One flex child holds both the peer list and the contact line, because the
+   footer row is a wrapping flex container and a `flex-basis: 100%` child still
+   shared a line with the tag. A single wrapper cannot be split. */
+.footer-extra {
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 4px 0 0;
 }
+
+.peer-sites { display: block; }
 
 .peer-sites-label {
   display: block;
@@ -1331,6 +1335,30 @@ input.share-url:focus-visible {
   color: var(--muted, var(--fg-dim));
   font-variant-numeric: tabular-nums;
 }
+
+/* The contact line sits with the related-tools block, on its own footer line,
+   above the tag and the legal links. */
+/* The rule under the contact line, not under the peer list, so the two group
+   as one block: what else is here, and how to reach a person about it. */
+/* The base `p` rule caps every paragraph at 62ch for readability. That is
+   right for prose and wrong for a one-line footer row, where it left the rule
+   under this line ending halfway across the page. */
+.footer-contact {
+  max-width: none;
+  margin: 10px 0 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.footer-contact a {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-contact a:hover { color: var(--fg); }
 
 .erabbit-mark {
   display: block;
