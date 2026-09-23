@@ -37,6 +37,7 @@ import { dirname, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createRequire } from "node:module"
 import { createHash } from "node:crypto"
+import { execFileSync } from "node:child_process"
 
 const require = createRequire(import.meta.url)
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -46,7 +47,20 @@ const CN = require(join(ROOT, "assets/color-names.js"))
 const { COPY } = require(join(HERE, "shades_copy.cjs"))
 
 const SITE = "https://gamutlens.com"
-const TODAY = "2026-08-11"
+/* The date a page last changed, as YYYY-MM-DD: the day of the last commit that
+   touched the file the URL serves, not its mtime. A fresh clone gives every
+   file the same mtime, and this generator rewrites every page it owns on every
+   run whether the content changed or not. Neither number is the day the page
+   last changed. The commit date is. Where git cannot answer, the mtime is what
+   is left. */
+function lastChanged(file) {
+  try {
+    const out = execFileSync("git", ["log", "-1", "--format=%ad", "--date=short", "--", file],
+                             { cwd: ROOT, encoding: "utf8", timeout: 20000 }).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(out)) return out
+  } catch {}
+  return new Date(statSync(file).mtime).toISOString().slice(0, 10)
+}
 const check = process.argv.includes("--check")
 
 /* ------------------------------------------------------------------ chrome */
@@ -210,8 +224,45 @@ function head({ title, description, canonical, jsonLd }) {
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">${jsonLd}</script>
+  <!-- schema:start -->
+  ${breadcrumbLd(canonical, shortName(title))}
+  <!-- schema:end -->
   ${ADSENSE}
 </head>`
+}
+
+/* The page's own name, taken off its title. "Color Shades Generator — Tints,
+   Shades, Tones | gamutlens.com" is "Color Shades Generator". */
+function shortName(title) {
+  return title.split(" | ")[0].split(" \u2014 ")[0].trim()
+}
+
+/* Section hubs that really exist, as a path prefix. A page under one gets a
+   three-item trail. Everything else gets two. */
+const SECTIONS = [["/articles/", "Articles"]]
+
+/* One BreadcrumbList for a page, or "" for the site root.
+ *
+ * The last item is the page's own canonical URL, so both members of a twin
+ * pair carry the same trail: `/x.html` and `/x/index.html` canonicalize to the
+ * same address and must not claim to be two places. */
+function breadcrumbLd(canonical, name) {
+  const path = canonical.startsWith(SITE) ? canonical.slice(SITE.length) : canonical
+  if (path === "/" || path === "") return ""
+  // The error page is served for any address that does not exist, so a trail
+  // ending in "404" names a page nobody asked for. Structured data on an
+  // error page is an anti-pattern, and the rest of this portfolio omits it.
+  if (path === "/404.html" || path === "/404/") return ""
+  const items = [{ "@type": "ListItem", position: 1, name: "Home", item: SITE + "/" }]
+  for (const [prefix, label] of SECTIONS) {
+    if (path.startsWith(prefix) && path !== prefix) {
+      items.push({ "@type": "ListItem", position: 2, name: label, item: SITE + prefix })
+    }
+  }
+  items.push({ "@type": "ListItem", position: items.length + 1, name, item: canonical })
+  return `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items,
+  })}</script>`
 }
 
 /* Brand and one icon button, nothing else — no links, and not sticky, because
@@ -237,9 +288,38 @@ ${toolbar(current)}
 const FOOTER_RAIL =
   '      <div class="swatch-rail" data-rail aria-label="Site accent color"><span class="rail-label">Site accent</span></div>'
 
+/* The sibling sites in this portfolio. Four, not nineteen: a footer that lists
+   every domain the owner has reads as a link farm and is worth nothing to a
+   reader. These four are what a visitor to a colour tool plausibly wants next.
+   Each link says what the site does before it says the domain, because
+   "photoshrink.net" tells a reader nothing. */
+const PEERS = [
+  ["https://photoshrink.net/", "Resize, compress and convert images", "photoshrink.net"],
+  ["https://fontloom.com/", "Fancy text and Unicode fonts", "fontloom.com"],
+  ["https://qrmint.net/", "QR codes, generate and scan", "qrmint.net"],
+  ["https://devboxkit.com/", "JSON, Base64, hashes and dev tools", "devboxkit.com"],
+]
+
+function peersBlock() {
+  return [
+    '      <nav class="peer-sites" aria-label="Related tools">',
+    '        <span class="peer-sites-label">Related tools</span>',
+    "        <ul>",
+    ...PEERS.map(([href, text, domain]) =>
+      `          <li><a href="${href}" rel="noopener">${esc(text)}</a><span class="peer-domain">${esc(domain)}</span></li>`),
+    "        </ul>",
+    "      </nav>",
+  ].join("\n")
+}
+
+const PEERS_REGION = `      <!-- peers:start -->
+${peersBlock()}
+      <!-- peers:end -->`
+
 const FOOTER = `  <footer class="site-footer">
     <div class="wrap">
 ${FOOTER_RAIL}
+${PEERS_REGION}
       <p class="footer-tag">gamutlens.com — browser-only color tools. Nothing you type or upload ever leaves this tab.</p>
       <ul class="footer-links">
         <li><a href="/articles/">Articles</a></li>
@@ -1168,6 +1248,51 @@ function syncTwins() {
   }
 }
 
+/** Write the schema region and the related-tools region into a hand-written
+ *  page.
+ *
+ *  Generated pages get both from head() and FOOTER, so this only fills the
+ *  pages nothing else writes. Each region is a marker pair; on the first run
+ *  the markers do not exist and this inserts them, and every later run
+ *  rewrites the body between them. That makes the first sweep and every later
+ *  sweep the same operation.
+ */
+function syncSchema(file) {
+  const rel = relative(ROOT, file)
+  if (GENERATED.has(rel)) return
+  const src = readFileSync(file, "utf8")
+  let updated = src
+
+  const canonical = (src.match(/<link rel="canonical" href="([^"]+)"/) || [])[1]
+    || SITE + pageUrl(file)
+  const title = (src.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || ""
+  const crumb = breadcrumbLd(canonical, shortName(title.replace(/\s+/g, " ").trim()))
+  updated = spliceRegion(updated, "schema", crumb ? "  " + crumb : "", "  ", "</head>")
+  updated = spliceRegion(updated, "peers", peersBlock(), "      ",
+                         '      <p class="footer-tag">')
+
+  const relKey = rel + " (schema)"
+  if (check) {
+    if (updated !== src) stale.push(relKey)
+    return
+  }
+  if (updated !== src) writeFileSync(file, updated)
+}
+
+/** Rewrite one marker region, inserting the markers before `before` the first
+ *  time. `indent` is the indent the markers carry. */
+function spliceRegion(src, name, body, indent, before) {
+  const open = `${indent}<!-- ${name}:start -->`
+  const close = `${indent}<!-- ${name}:end -->`
+  const block = body ? `${open}\n${body}\n${close}\n` : `${open}\n${close}\n`
+  const re = new RegExp(`[ \\t]*<!-- ${name}:start -->[\\s\\S]*?<!-- ${name}:end -->\\n`)
+  if (re.test(src)) return src.replace(re, block)
+  const at = src.indexOf(before)
+  if (at === -1) return src
+  const lineStart = src.lastIndexOf("\n", at) + 1
+  return src.slice(0, lineStart) + block + src.slice(lineStart)
+}
+
 /** Put the manifest link and the theme colour into the head of a hand-written
  *  page. Both go directly after the viewport meta tag. Idempotent: a tag that
  *  is already in the head is left where it is. */
@@ -1372,7 +1497,7 @@ function sitemap() {
   const urls = siteUrls()
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    urls.map(u => `  <url><loc>${SITE}${u}</loc><lastmod>${TODAY}</lastmod></url>`).join("\n") +
+    urls.map(u => `  <url><loc>${SITE}${u}</loc><lastmod>${lastChanged(pageFile(u))}</lastmod></url>`).join("\n") +
     "\n</urlset>\n"
   )
 }
@@ -1545,6 +1670,9 @@ syncTwins()
 for (const file of allHtmlFiles()) {
   syncHead(file)
   syncChrome(file)
+  // After syncChrome, because it is what puts the footer rail in place and the
+  // related-tools region is spliced relative to the footer tag under it.
+  syncSchema(file)
 }
 // Last, because the cache name hashes the pages as they are on disk now.
 write("sw.js", serviceWorker())
