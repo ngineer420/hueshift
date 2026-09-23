@@ -53,7 +53,38 @@ const SITE = "https://gamutlens.com"
    run whether the content changed or not. Neither number is the day the page
    last changed. The commit date is. Where git cannot answer, the mtime is what
    is left. */
+function dirtyPaths() {
+  /* Every path git reports as changed or untracked, in one call for the whole
+     repo rather than one call per file. */
+  const out = new Set()
+  try {
+    const raw = execFileSync("git", ["status", "--porcelain", "-z"],
+                             { cwd: ROOT, encoding: "utf8", timeout: 20000 })
+    const fields = raw.split("\0")
+    for (let i = 0; i < fields.length; i++) {
+      const entry = fields[i]
+      if (entry.length < 4) continue
+      const status = entry.slice(0, 2)
+      let name = entry.slice(3)
+      // A rename entry is "R  old" with the new path in the next field, and
+      // the new path is the one on disk.
+      if (status.includes("R") && i + 1 < fields.length) name = fields[++i]
+      out.add(join(ROOT, name))
+    }
+  } catch {}
+  return out
+}
+
+const DIRTY = dirtyPaths()
+const TODAY = new Date().toISOString().slice(0, 10)
+
 function lastChanged(file) {
+  /* A file that is dirty or untracked changed today, whatever git history
+     says. That case is not an edge: the sitemap is written BEFORE the commit
+     that carries it, so without this the date would be the PREVIOUS commit's,
+     and `--check` on a clean main failed the moment the commit landed, with
+     every URL moved forward and nothing actually changed. */
+  if (DIRTY.has(file)) return TODAY
   try {
     const out = execFileSync("git", ["log", "-1", "--format=%ad", "--date=short", "--", file],
                              { cwd: ROOT, encoding: "utf8", timeout: 20000 }).trim()
@@ -300,8 +331,27 @@ const PEERS = [
   ["https://devboxkit.com/", "JSON, Base64, hashes and dev tools", "devboxkit.com"],
 ]
 
+/* The portfolio contact address, written with the `@` as an HTML entity in both
+   the href and the visible text. A browser decodes an entity in an attribute
+   value, so the link works for a mouse, a keyboard and a screen reader, while a
+   scraper reading the raw HTML for a plain address finds nothing. Nothing here
+   depends on JavaScript: a contact link that needs a script to work is worse
+   than an address in plain sight. */
+const CONTACT_ADDRESS = "hello@goodbotbad.bot"
+const CONTACT_LEAD = "Questions, or a colour coming out wrong?"
+
+/* Every character as a decimal numeric character reference. The HTML parser
+   decodes them while it parses, so the href is a real mailto: URL, the anchor
+   keeps its place in the tab order, and a screen reader reads the plain
+   address. Neither "@" nor "mailto:hello" appears in the bytes on disk. */
+const ncr = text => [...text].map(c => `&#${c.codePointAt(0)};`).join("")
+
+/* One flex child, not three. The footer row is a wrapping flex container and a
+   `flex-basis: 100%` child still shared a line with the tag, so the block and
+   the contact line go inside a single wrapper that the row cannot split. */
 function peersBlock() {
   return [
+    '      <div class="footer-extra">',
     '      <nav class="peer-sites" aria-label="Related tools">',
     '        <span class="peer-sites-label">Related tools</span>',
     "        <ul>",
@@ -309,6 +359,8 @@ function peersBlock() {
       `          <li><a href="${href}" rel="noopener">${esc(text)}</a><span class="peer-domain">${esc(domain)}</span></li>`),
     "        </ul>",
     "      </nav>",
+    `      <p class="footer-contact">${CONTACT_LEAD} <a href="${ncr("mailto:" + CONTACT_ADDRESS)}">${ncr(CONTACT_ADDRESS)}</a></p>`,
+    "      </div>",
   ].join("\n")
 }
 
