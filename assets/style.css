@@ -1277,6 +1277,61 @@ input.share-url:focus-visible {
   color: var(--fg-dim);
 }
 
+/* Related tools: the sibling sites in this portfolio. The footer .wrap is a
+   wrapping flex row, so the block claims a whole line of its own rather than
+   competing with the tag and the legal links for the same row. */
+.peer-sites {
+  flex: 1 0 100%;
+  margin: 4px 0 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.peer-sites-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.peer-sites ul {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 28px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+@media (min-width: 620px) {
+  .peer-sites ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.peer-sites li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.peer-sites a {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.peer-sites a:hover { color: var(--fg); }
+
+.peer-domain {
+  font-size: 11px;
+  color: var(--muted, var(--fg-dim));
+  font-variant-numeric: tabular-nums;
+}
+
 .erabbit-mark {
   display: block;
   width: 10px;
