@@ -1139,6 +1139,35 @@ function syncChrome(file) {
   if (updated !== src) writeFileSync(file, updated)
 }
 
+/** Mirror every hand-written page onto its twin URL.
+ *
+ * Each tool ships at two paths — `slug.html` and `slug/index.html` — and the
+ * two must be byte-identical, because both set the same canonical URL. GitHub
+ * Pages serves the DIRECTORY file for `/slug/`, so a directory copy that falls
+ * behind is the copy Google indexes. That is what happened to
+ * `/contrast-checker/` and `/color-palette-generator/` (gamutlens#20): the flat
+ * file gained a cross-link to the colour blindness simulator and the directory
+ * file did not.
+ *
+ * The flat `slug.html` file is the source. Edit that one; this step copies it
+ * over `slug/index.html`. Generated pages are skipped — writeBoth() already
+ * writes both of their copies from one string.
+ */
+function syncTwins() {
+  for (const file of allHtmlFiles()) {
+    const rel = relative(ROOT, file).split(sep).join("/")
+    if (rel === "index.html" || rel.endsWith("/index.html")) continue
+    const twin = rel.slice(0, -".html".length) + "/index.html"
+    if (GENERATED.has(rel) || GENERATED.has(twin)) continue
+    let current = null
+    try { current = readFileSync(join(ROOT, twin), "utf8") } catch { continue }
+    const source = readFileSync(file, "utf8")
+    if (current === source) continue
+    if (check) stale.push(twin + " (twin of " + rel + ")")
+    else writeFileSync(join(ROOT, twin), source)
+  }
+}
+
 /** Put the manifest link and the theme colour into the head of a hand-written
  *  page. Both go directly after the viewport meta tag. Idempotent: a tag that
  *  is already in the head is left where it is. */
@@ -1510,6 +1539,9 @@ for (const pair of PAIRS) writeBoth(pair.slug, pairPage(pair))
 for (const family of FAMILIES) writeBoth(`shades-of-${family.key}`, familyPage(family))
 write("sitemap.xml", sitemap())
 syncHomepage()
+// Before the per-file sweeps, so that a page and its twin enter them equal and
+// leave them equal.
+syncTwins()
 for (const file of allHtmlFiles()) {
   syncHead(file)
   syncChrome(file)
