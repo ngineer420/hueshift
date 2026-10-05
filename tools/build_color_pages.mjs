@@ -319,15 +319,13 @@ ${toolbar(current)}
 const FOOTER_RAIL =
   '      <div class="swatch-rail" data-rail aria-label="Site accent color"><span class="rail-label">Site accent</span></div>'
 
-/* The sibling sites in this portfolio. Four, not nineteen: a footer that lists
+/* The sibling sites in this portfolio. Two, not nineteen: a footer that lists
    every domain the owner has reads as a link farm and is worth nothing to a
-   reader. These four are what a visitor to a colour tool plausibly wants next.
+   reader. These two are what a visitor to a colour tool plausibly wants next.
    Each link says what the site does before it says the domain, because
    "photoshrink.net" tells a reader nothing. */
 const PEERS = [
   ["https://photoshrink.net/", "Resize, compress and convert images", "photoshrink.net"],
-  ["https://fontloom.com/", "Fancy text and Unicode fonts", "fontloom.com"],
-  ["https://qrmint.net/", "QR codes, generate and scan", "qrmint.net"],
   ["https://devboxkit.com/", "JSON, Base64, hashes and dev tools", "devboxkit.com"],
 ]
 
